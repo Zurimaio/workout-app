@@ -1,0 +1,71 @@
+[{
+        "raggruppamento": 1,
+        "tipologia": "TABATA",
+        "ambito": "MOBILITY",
+        "esercizio": "SPALLE - ATTIVA  -  APERTURA  ALLA PARETE",
+        "set": 5,
+        "volume": 20,
+        "unita": "SEC",
+        "rest": 15
+    },
+    {
+        "raggruppamento": 1,
+        "tipologia": "TABATA",
+        "ambito": "HS",
+        "esercizio": "FROG STAND",
+        "set": 5,
+        "volume": 20,
+        "unita": "SEC",
+        "rest": 15
+    },
+    {
+        "raggruppamento": 1,
+        "tipologia": "TABATA",
+        "ambito": "CORE",
+        "esercizio": "HOLLOW",
+        "set": 5,
+        "volume": 20,
+        "unita": "SEC",
+        "rest": 15
+    },
+    {
+        "raggruppamento": 2,
+        "tipologia": "TABATA",
+        "ambito": "HS",
+        "esercizio": "SLANCI LIBERI + FALLING STEP",
+        "set": 2,
+        "volume": 60,
+        "unita": "SEC",
+        "rest": 10
+    },
+    {
+        "raggruppamento": 3,
+        "tipologia": "ESERCIZIO",
+        "ambito": "SPINTA",
+        "esercizio": "TUCK RAISE",
+        "set": 8,
+        "volume": 1,
+        "unita": "REPS",
+        "rest": 90
+    },
+    {
+        "raggruppamento": 4,
+        "tipologia": "ESERCIZIO",
+        "ambito": "SPINTA",
+        "esercizio": "INV LEAN PUSHUP / PELICAN",
+        "set": 4,
+        "volume": 4,
+        "unita": "REPS",
+        "rest": 120
+    },
+    {
+        "raggruppamento": 5,
+        "tipologia": "ESERCIZIO",
+        "ambito": "SPINTA",
+        "esercizio": "TUCK PLANCHE",
+        "set": 5,
+        "volume": 10,
+        "unita": "SEC",
+        "rest": 50
+    }
+]
