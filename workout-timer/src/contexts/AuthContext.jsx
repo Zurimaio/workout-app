@@ -6,8 +6,8 @@ import {
   onAuthStateChanged,
   signOut,
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword
 } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
 
 const AuthContext = createContext();
 
@@ -23,7 +23,6 @@ export function AuthProvider({ children }) {
       if (user) {
         const tokenResult = await user.getIdTokenResult();
         setRole(tokenResult.claims.role || "user"); // default user
-        console.log("ruolo impostato: ", role)
         setUser(user);
       } else {
         setUser(null);
@@ -44,8 +43,10 @@ const logout = async () => {
   setRole(null);
 };
 
+  const signup = (email, password) => createUserWithEmailAndPassword(auth, email, password);
+
   return (
-    <AuthContext.Provider value={{ user, role, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, role, login, logout, signup, loading }}>
       {!loading && children}
     </AuthContext.Provider>
   );

@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 
 
 export default function Login() {
-  const {login, signup } = useAuth();
+  const {login, auth, role, signup } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -15,37 +15,38 @@ export default function Login() {
   const navigate = useNavigate();
 
 
-  const checkUserRole = async (uid, email) => {
-    const docRef = doc(db, "admins", uid);
-    console.log("uid:" ,uid);
+    // Crea il profilo base in users/{uid} e ritorna il ruolo
+  const createUserProfile = async (user, email) => {
+    const docRef = doc(db, "users", user.uid);
     const docSnap = await getDoc(docRef);
-    console.log("docSnap.data(): ", docSnap.data());
-
+    
     if (docSnap.exists()) {
-      return docSnap.data().role; // "admin" o "user"
+      const tokenResult = await user.getIdTokenResult(true);
+      return tokenResult.claims.role || "user"; // "admin" o "user"
     } else {
-      // Se è un nuovo utente, creiamo il profilo base
       await setDoc(docRef, {
         email,
         role: "user", // default
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
       });
       return "user";
     }
   };
 
-  const handleLogin = async () => {
+    const handleLogin = async () => {
     try {
-      const user = await login(email, password);
-      /*const role = await checkUserRole(user.uid, email);*/
-      const role = "user";
-  
-       // Redirect automatico in base al ruolo
-      if (role === "admin") {
-        navigate("/admin");
-      } else {
-        navigate("/");
-      }
+      const userCredential = await login(email, password);
+      const user = userCredential.user;
+
+      // Recupera ruolo da Firestore
+      const role = await createUserProfile(user, email);
+      setIsAdmin(role === "admin");
+
+      console.log("Ruolo: ", role);
+      await user.getIdToken(true);
+
+     // Redirect automatico in base al ruolo
+      navigate(role === "admin" ? "/admin" : "/");
     } catch (err) {
       setError(err.message);
     }
@@ -53,18 +54,28 @@ export default function Login() {
   };
 
   const handleSignup = async () => {
+    setError("");
     try {
-      const user = await signup(email, password);
-      // Al momento il ruolo è sempre "user"
-      const role = await checkUserRole(user.uid, email);
+      const userCredential = await signup(email, password);
+      const user = userCredential.user;
+
+      const role = await createUserProfile(user.uid, email);
       setIsAdmin(role === "admin");
+
+      await user.getIdToken(true);
+
+      navigate(role === "admin" ? "/admin" : "/");
     } catch (err) {
-      setError(err.message);
+      if (err.code === "auth/email-already-in-use") {
+        setError("Questa email è già registrata. Prova a fare login.");
+      } else {
+        setError(err.message);
+      }
     }
   };
 
   return (
-    <div className="p-4 max-w-md mx-auto bg-gray-50 rounded shadow mt-20">
+     <div className="p-4 max-w-md mx-auto bg-gray-50 rounded shadow mt-20">
       <h2 className="text-xl font-bold mb-4">Login / Registrati</h2>
       <input
         type="email"
@@ -82,8 +93,18 @@ export default function Login() {
       />
       {error && <p className="text-red-500 mb-2">{error}</p>}
       <div className="flex gap-2">
-        <button onClick={handleLogin} className="bg-blue-500 text-white px-4 py-2 rounded">Login</button>
-        <button onClick={handleSignup} className="bg-green-500 text-white px-4 py-2 rounded">Registrati</button>
+        <button
+          onClick={handleLogin}
+          className="bg-blue-500 text-white px-4 py-2 rounded"
+        >
+          Login
+        </button>
+        <button
+          onClick={handleSignup}
+          className="bg-green-500 text-white px-4 py-2 rounded"
+        >
+          Registrati
+        </button>
       </div>
 
       {isAdmin && (

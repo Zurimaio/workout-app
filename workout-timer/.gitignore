@@ -1,0 +1,24 @@
+# Node modules
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# System files
+.DS_Store
+
+
+#functions
+functions/calisthenics-workout-tra-a0036-firebase-adminsdk-fbsvc-9b488b8b1f.json
+functions/promoteAdmin.js

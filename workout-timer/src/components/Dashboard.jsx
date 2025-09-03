@@ -1,85 +1,98 @@
-// src/components/Dashboard.jsx
+import React, { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { MdFitnessCenter, MdPerson, MdBarChart, MdAdminPanelSettings, MdMenu } from "react-icons/md";
+
+import MyWorkouts from "./MyWorkouts";
+import ProfileMenu from "./ProfileMenu";
 import Timer from "./Timer";
 import PreviewWorkout from "./PreviewWorkout";
-import ProfileMenu from "./ProfileMenu";
-import MyWorkouts from "./MyWorkouts";
-import React, { useState, useEffect } from "react";
 
+// Placeholder Statistiche
+function StatsPlaceholder() {
+  return (
+    <div className="p-6 text-gray-600">
+      🚧 Statistiche in arrivo...
+    </div>
+  );
+}
 
 export default function Dashboard() {
-  const { user, role } = useAuth();
-  const [view, setView] = useState("home"); // home, upload, create, timer, preview, admin, myWorkouts
+  const {user, role } = useAuth();
+  const [view, setView] = useState("myWorkouts");
   const [workoutData, setWorkoutData] = useState(null);
   const [myWorkouts, setMyWorkouts] = useState([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-useEffect(() => {
-        console.log("ruolo impostato: ", role)
-}, []);
+  const menuItems = [
+    { key: "myWorkouts", label: "Le mie Schede", icon: <MdFitnessCenter /> },
+    { key: "profile", label: "Profilo", icon: <MdPerson /> },
+    { key: "stats", label: "Statistiche", icon: <MdBarChart /> },
+  ];
 
+  if (role === "admin") menuItems.push({ key: "admin", label: "Admin Panel", icon: <MdAdminPanelSettings /> });
 
-    return (
-      <div className="min-h-screen bg-gray-100 p-4 relative">
+  return (
+    <div className="flex h-screen bg-gray-100">
+      {/* Sidebar mobile toggle */}
+      <div className="md:hidden absolute top-4 left-4 z-20">
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="p-2 rounded bg-white shadow"
+        >
+          <MdMenu size={24} />
+        </button>
+      </div>
 
-        {/* Pulsante profilo */}
-        <div className="absolute top-4 right-4 flex gap-2">
+      {/* Sidebar */}
+      <aside
+        className={`fixed md:relative z-10 w-64 bg-white shadow-lg h-full transform transition-transform duration-300
+          ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}
+      >
+        <div className="h-16 flex items-center justify-center font-bold text-xl border-b">
+          🏋️ WorkoutApp
+        </div>
+        <nav className="flex-1 px-2 py-4 space-y-2">
+          {menuItems.map(item => (
+            <button
+              key={item.key}
+              onClick={() => { setView(item.key); setSidebarOpen(false); }}
+              className={`flex items-center gap-2 w-full px-3 py-2 rounded hover:bg-indigo-100 transition ${
+                view === item.key ? "bg-indigo-200 font-semibold" : ""
+              }`}
+            >
+              {item.icon} <span>{item.label}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="p-4 border-t mt-auto">
           <ProfileMenu />
-          {(
+        </div>
+      </aside>
+
+      {/* Content area */}
+      <main className="flex-1 overflow-auto p-6 md:ml-64">
+        {view === "myWorkouts" && (
+          <MyWorkouts
+            workouts={myWorkouts}
+            onPreview={(groups) => { setWorkoutData(groups); setView("preview"); }}
+            onStart={(groups) => { setWorkoutData(groups); setView("timer"); }}
+          />
+        )}
+
+        {view === "profile" && (
+          <div className="p-4 bg-white rounded shadow">
+            <h2 className="text-2xl font-bold mb-4">Profilo</h2>
+            <p>Email: {user?.email}</p>
+            <p>Ruolo: {role}</p>
+          </div>
+        )}
+
+        {view === "stats" && <StatsPlaceholder />}
+
+        {view === "preview" && workoutData && (
+          <div>
             <button
               onClick={() => setView("myWorkouts")}
-              className="bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-600"
-            >
-              Le mie schede
-            </button>
-          )}
-        </div>
-  
-        {/* HOME */}
-        {view === "home" && (
-          <div className="flex flex-col items-center gap-6 mt-20 w-full max-w-xl mx-auto">
-            <h1 className="text-3xl font-bold mb-4">Workout Timer</h1>
-            {(
-              <div className="flex gap-4 mb-6">
-                <button
-                  onClick={() => setView("upload")}
-                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                >
-                  Carica Workout
-                </button>
-                <button
-                  onClick={() => setView("create")}
-                  className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-                >
-                  Crea Workout
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-  
-        {/* MY WORKOUTS - utenti standard */}
-        {view === "myWorkouts" && (
-          <div>
-            <button
-              onClick={() => setView("home")}
-              className="mb-4 bg-gray-300 text-black px-4 py-2 rounded hover:bg-gray-400"
-            >
-              ← Torna alla Home
-            </button>
-            <MyWorkouts
-              workouts={myWorkouts}
-              onPreview={(groups) => { setWorkoutData(groups); setView("preview"); }}
-              onStart={(groups) => { setWorkoutData(groups); setView("timer"); }}
-            />
-          </div>
-        )}
-  
-       
-        {/* PREVIEW */}
-        {view === "preview" && (
-          <div>
-            <button
-              onClick={() => setView("home")}
               className="mb-4 bg-gray-300 text-black px-4 py-2 rounded hover:bg-gray-400"
             >
               ← Torna alla Home
@@ -87,36 +100,30 @@ useEffect(() => {
             <PreviewWorkout
               workoutData={workoutData}
               onStart={() => setView("timer")}
-              onBack={() => setView("home")}
+              onBack={() => setView("myWorkouts")}
             />
           </div>
         )}
-  
-        {/* TIMER */}
-        {view === "timer" && (
+
+        {view === "timer" && workoutData && (
           <div>
             <button
-              onClick={() => setView("home")}
+              onClick={() => setView("myWorkouts")}
               className="mb-4 bg-gray-300 text-black px-4 py-2 rounded hover:bg-gray-400"
             >
               ← Torna alla Home
             </button>
-            <Timer workoutData={workoutData} onExit={() => setView("home")} />
+            <Timer workoutData={workoutData} onExit={() => setView("myWorkouts")} />
           </div>
         )}
-  
-        {/* ADMIN */}
+
         {role === "admin" && view === "admin" && (
           <div>
-            <button
-              onClick={() => setView("home")}
-              className="mb-4 bg-gray-300 text-black px-4 py-2 rounded hover:bg-gray-400"
-            >
-              ← Torna alla Home
-            </button>
-            <AdminPanel />
+            <h2 className="text-2xl font-bold mb-4">Admin Panel</h2>
+            {/* AdminPanel qui */}
           </div>
         )}
-      </div>
-    );
+      </main>
+    </div>
+  );
 }

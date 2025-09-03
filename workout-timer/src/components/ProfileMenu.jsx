@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { updatePassword } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
@@ -9,6 +9,7 @@ const { user, logout } = useAuth();
   const [showChangePwd, setShowChangePwd] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [userProfile, setUserProfile] = useState(null);
   const navigate = useNavigate();
 
   if (!user) return null;
@@ -29,6 +30,26 @@ const { user, logout } = useAuth();
     navigate("/login"); // redirect alla pagina di login
   };
 
+useEffect(() => {
+  console.log(user);
+});
+
+
+// --- Carica gli utenti da Firestore
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        const snapshot = await getDocs(collection(db, "users"));
+        const userList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        if(userList.id === user.id) {
+          setUserProfile(user.data());
+        }
+      } catch (err) {
+        console.error("Errore caricamento utenti:", err);
+      }
+    };
+    loadUsers();
+  }, []);
 
   return (
     <div className="relative inline-block text-left">

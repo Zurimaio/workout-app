@@ -15,7 +15,6 @@ useEffect(() => {
       setLoading(true);
       try {
         const colRef = collection(db, "workouts", user.uid, "userWorkouts");
-        console.log("UID: ", user.uid)
         const snapshot = await getDocs(colRef);
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setWorkouts(data);

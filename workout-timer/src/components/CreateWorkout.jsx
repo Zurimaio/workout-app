@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { db } from "../../lib/firebase";
-import { doc, getDoc, collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, getDocs, collection, addDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useAuth } from "../contexts/AuthContext"; // Assicurati che il context sia corretto
 
-export default function CreateWorkout({ onGenerated }) {
+export default function CreateWorkout({ selectedUser, onGenerated }) {
   const { user } = useAuth(); // user loggato
   const [exerciseDB, setExerciseDB] = useState({});
   const [groups, setGroups] = useState({});
   const [currentGroup, setCurrentGroup] = useState("1");
+  const [userList, setUserList] = useState([]);
+  
   const [currentExercise, setCurrentExercise] = useState({
     Tipologia: "",
     Ambito: "",
@@ -23,6 +25,21 @@ export default function CreateWorkout({ onGenerated }) {
   const [availablePilastri, setAvailablePilastri] = useState([]);
   const [availableEsercizi, setAvailableEsercizi] = useState([]);
   const [workoutName, setWorkoutName] = useState("");
+
+  // --- Carica gli utenti da Firestore
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        const snapshot = await getDocs(collection(db, "users"));
+        const userList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setUserList(userList);
+      } catch (err) {
+        console.error("Errore caricamento utenti:", err);
+      }
+    };
+    loadUsers();
+  }, []);
+
 
   // --- Carica DB da Firestore
   useEffect(() => {
@@ -108,32 +125,38 @@ export default function CreateWorkout({ onGenerated }) {
     onGenerated(groups);
   };
 
-  const handleSaveWorkout = async () => {
-    if (!workoutName) return alert("Inserisci un nome per il workout.");
-    if (!user) return alert("Devi essere loggato per salvare il workout.");
+ const handleSaveWorkout = async () => {
+  if (!workoutName) return alert("Inserisci un nome per il workout.");
+  if (!user) return alert("Devi essere loggato per salvare il workout.");
+  if (!selectedUser) return alert("Seleziona un utente a cui assegnare il workout.");
 
-    try {
-      const userId = user.uid; // ID dell'utente loggato
-      const userWorkoutsRef = collection(db, "workouts", userId, "userWorkouts");
-      
-      const workoutDocRef = doc(userWorkoutsRef);
+  console.log(selectedUser);
 
-      await setDoc(workoutDocRef, {
-        name: workoutName,
-        createdAt: serverTimestamp(),
-        groups
-      });
+  try {
+    // riferimento alla sottocollezione dei workout dell’utente selezionato
+    const userWorkoutsRef = collection(db, "workouts", selectedUser.id, "userWorkouts");
 
-      alert("Workout salvato con successo!");
-    } catch (err) {
-      console.error("Errore salvataggio workout:", err);
-      alert("Errore durante il salvataggio!");
-    }
-  };
+    // aggiunge un nuovo documento con ID generato da Firestore
+    await addDoc(userWorkoutsRef, {
+      name: workoutName,
+      createdAt: serverTimestamp(),
+      groups
+    });
+
+    alert(`Workout salvato per ${selectedUser.email}!`);
+    setGroups({});
+    setWorkoutName("");
+    
+
+  } catch (err) {
+    console.error("Errore salvataggio workout:", err);
+    alert("Errore durante il salvataggio!");
+  }
+};
 
   return (
     <div className="p-4 max-w-xl mx-auto bg-gray-50 rounded shadow">
-      <h2 className="text-xl font-bold mb-2">Crea Workout Avanzato</h2>
+      <h2 className="text-xl font-bold mb-2">Crea Workout Avanzato per {selectedUser?.email}</h2>
 
       <div className="mb-2">
         <span className="mr-2">Gruppo corrente: {currentGroup}</span>
@@ -234,6 +257,9 @@ export default function CreateWorkout({ onGenerated }) {
         onChange={(e) => setWorkoutName(e.target.value)}
         className="border p-2 rounded mb-2 w-full"
       />
+
+   
+
       <button
         onClick={handleSaveWorkout}
         className="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600 transition mb-4"
