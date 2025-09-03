@@ -22,3 +22,4 @@ yarn-error.log*
 #functions
 functions/calisthenics-workout-tra-a0036-firebase-adminsdk-fbsvc-9b488b8b1f.json
 functions/promoteAdmin.js
+../workout-planner/
