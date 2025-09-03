@@ -2,6 +2,9 @@ import React, { useEffect, useState } from "react";
 import { db } from "../../../lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import ExerciseList from "./ExerciseList";
+import UploadWorkout from "../UploadWorkout";
+import CreateWorkout from "../CreateWorkout";
+
 
 export default function AdminPanel({ onBack }) {
   const [exerciseDB, setExerciseDB] = useState({});
@@ -60,6 +63,44 @@ export default function AdminPanel({ onBack }) {
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Pannello Admin - Exercise DB</h1>
+
+       {/* UPLOAD */}
+        {view === "upload" && (
+          <div>
+            <button
+              onClick={() => setView("home")}
+              className="mb-4 bg-gray-300 text-black px-4 py-2 rounded hover:bg-gray-400"
+            >
+              ← Torna alla Home
+            </button>
+            <UploadWorkout
+              onLoad={(data) => {
+                setWorkoutData(data);
+                setView("preview");
+              }}
+            />
+          </div>
+        )}
+  
+        {/* CREATE */}
+        {view === "create" && (
+          <div>
+            <button
+              onClick={() => setView("home")}
+              className="mb-4 bg-gray-300 text-black px-4 py-2 rounded hover:bg-gray-400"
+            >
+              ← Torna alla Home
+            </button>
+            <CreateWorkout
+              onGenerated={(data) => {
+                setWorkoutData(data);
+                setView("preview");
+              }}
+            />
+          </div>
+        )}
+  
+
 
       {/* Upload JSON */}
       <div className="mb-4">

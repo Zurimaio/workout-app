@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { updatePassword } from "firebase/auth";
+import { useNavigate } from "react-router-dom";
 
 export default function ProfileMenu() {
 const { user, logout } = useAuth();
@@ -8,6 +9,7 @@ const { user, logout } = useAuth();
   const [showChangePwd, setShowChangePwd] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [message, setMessage] = useState("");
+  const navigate = useNavigate();
 
   if (!user) return null;
 
@@ -21,6 +23,12 @@ const { user, logout } = useAuth();
       setMessage("Errore: " + err.message);
     }
   };
+
+   const handleLogout = async () => {
+    await logout();
+    navigate("/login"); // redirect alla pagina di login
+  };
+
 
   return (
     <div className="relative inline-block text-left">
@@ -69,14 +77,7 @@ const { user, logout } = useAuth();
                 Cambia password
               </button>
                 <button
-                    onClick={async () => {
-                        try {
-                            await logout();
-                        } catch (err) {
-                            console.error("Errore logout:", err);
-                            alert("Errore durante il logout");
-                        }
-                    }}
+                    onClick={handleLogout}
                     className="w-full text-left px-4 py-2 hover:bg-gray-100 text-red-500"
                 >
                 Logout

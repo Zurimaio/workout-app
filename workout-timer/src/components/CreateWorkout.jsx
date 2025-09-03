@@ -3,7 +3,6 @@ import { db } from "../../lib/firebase";
 import { doc, getDoc, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { useAuth } from "../contexts/AuthContext"; // Assicurati che il context sia corretto
 
-
 export default function CreateWorkout({ onGenerated }) {
   const { user } = useAuth(); // user loggato
   const [exerciseDB, setExerciseDB] = useState({});
@@ -116,6 +115,7 @@ export default function CreateWorkout({ onGenerated }) {
     try {
       const userId = user.uid; // ID dell'utente loggato
       const userWorkoutsRef = collection(db, "workouts", userId, "userWorkouts");
+      
       const workoutDocRef = doc(userWorkoutsRef);
 
       await setDoc(workoutDocRef, {

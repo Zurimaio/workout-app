@@ -3,13 +3,17 @@ import React, { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../lib/firebase";
+import { useNavigate } from "react-router-dom";
+
 
 export default function Login() {
-  const { login, signup } = useAuth();
+  const {login, signup } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
+  const navigate = useNavigate();
+
 
   const checkUserRole = async (uid, email) => {
     const docRef = doc(db, "admins", uid);
@@ -33,12 +37,19 @@ export default function Login() {
   const handleLogin = async () => {
     try {
       const user = await login(email, password);
-      const role = await checkUserRole(user.uid, email);
-      setIsAdmin(role === "admin");
-      // puoi salvare l'info in un contesto globale se serve
+      /*const role = await checkUserRole(user.uid, email);*/
+      const role = "user";
+  
+       // Redirect automatico in base al ruolo
+      if (role === "admin") {
+        navigate("/admin");
+      } else {
+        navigate("/");
+      }
     } catch (err) {
       setError(err.message);
     }
+    
   };
 
   const handleSignup = async () => {
