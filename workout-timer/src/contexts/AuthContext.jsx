@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { auth, db } from "../../lib/firebase";
 import {
+  getAuth,
   onAuthStateChanged,
   signOut,
   signInWithEmailAndPassword,
@@ -16,26 +17,14 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser);
+    const auth = getAuth();
 
-        try {
-          // Leggi il ruolo da Firestore
-          const userDocRef = doc(db, "users", firebaseUser.uid);
-          const userDocSnap = await getDoc(userDocRef);
-          
-          if (userDocSnap.exists()) {
-            const data = userDocSnap.data();
-            console.log("UserDocSnap ", userDocSnap)
-            setRole(data.role || "user"); // default user
-          } else {
-            setRole("user");
-          }
-        } catch (err) {
-          console.error("Errore caricamento dati utente:", err);
-          setRole("user");
-        }
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const tokenResult = await user.getIdTokenResult();
+        setRole(tokenResult.claims.role || "user"); // default user
+        console.log("ruolo impostato: ", role)
+        setUser(user);
       } else {
         setUser(null);
         setRole(null);
@@ -43,17 +32,21 @@ export function AuthProvider({ children }) {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return unsubscribe;
   }, []);
 
   const login = (email, password) =>
     signInWithEmailAndPassword(auth, email, password);
 
-  const logout = () => signOut(auth);
+const logout = async () => {
+  await signOut(auth);
+  setUser(null);
+  setRole(null);
+};
 
   return (
     <AuthContext.Provider value={{ user, role, login, logout, loading }}>
-      {children}
+      {!loading && children}
     </AuthContext.Provider>
   );
 }
