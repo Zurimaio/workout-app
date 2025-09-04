@@ -36,3 +36,4 @@ jobs:
             secrets.FIREBASE_SERVICE_ACCOUNT_CALISTHENICS_WORKOUT_TRA_A0036 }}
           channelId: ${{ github.ref == 'refs/heads/main' && 'live' || 'staging' }}
           projectId: calisthenics-workout-tra-a0036
+          entryPoint: ./workout-timer
