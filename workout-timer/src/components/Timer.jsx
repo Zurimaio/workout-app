@@ -106,56 +106,65 @@ export default function Timer({ workoutData, onExit }) {
       : 0;
 
 
-  // avvia workout quando finisce countdown
+   // --- Countdown preparatorio ---
   useEffect(() => {
-  if (prepTime === null) return;
-  if (prepTime <= 3 && prepTime > 0) playBeep(); // beep negli ultimi 3 secondi del countdown
-  if (prepTime === 0) {
-    setPrepTime(null);
-    setIsActive(true);
-    setTimeLeft(currentExercise.Volume);
-    return;
-  }
-
-  const timer = setTimeout(() => setPrepTime(prepTime - 1), 1000);
-  return () => clearTimeout(timer);
-}, [prepTime, currentExercise]);
-
+    if (prepTime === null) return;
+    if (prepTime <= 3 && prepTime > 0) playBeep();
+    if (prepTime === 0) {
+      setPrepTime(null);
+      setIsActive(true);
+      setTimeLeft(currentExercise.Volume);
+      return;
+    }
+    const timer = setTimeout(() => setPrepTime(prepTime - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [prepTime, currentExercise]);
 
 
-   // 🔔 Timer principale (affidabile anche in background)
-  useEffect(() => {
-    if (!isActive || isPaused || waitingNextGroup || showSummary) return;
+useEffect(() => {
+  if (!currentExercise || isPaused || waitingNextGroup || showSummary || !isActive) return;
 
-    const start = Date.now();
-    let prevTime = timeLeft;
+  const start = Date.now();
+  const totalDuration = isRest ? currentExercise.Rest : currentExercise.Volume;
+  const endTime = start + totalDuration * 1000;
+  let lastBeepSecond = null;
 
-    const interval = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - start) / 1000);
-      const newTime = (exerciseDuration || 0) - elapsed;
+  const interval = setInterval(() => {
+    if (isPaused) return;
 
-      if (newTime <= 3 && prevTime > 3) playBeep(); // beep ultimi 3 secondi
-      prevTime = newTime;
+    const now = Date.now();
+    const remaining = Math.ceil((endTime - now) / 1000);
 
-      if (newTime <= 0) {
-        clearInterval(interval);
-        if (!isRest) {
-          setIsRest(true);
-          setTimeLeft(currentExercise.Rest);
-        } else {
-          handleAdvance();
-        }
+    // beep negli ultimi 3 secondi, una volta per ciascun secondo
+    if (remaining <= 3 && remaining > 0 && remaining !== lastBeepSecond) {
+      playBeep();
+      lastBeepSecond = remaining;
+    }
+
+    if (remaining <= 0) {
+      clearInterval(interval);
+      if (!isRest) {
+        setIsRest(true);
+        setTimeLeft(currentExercise.Rest);
       } else {
-        setTimeLeft(newTime);
+        handleAdvance();
       }
-    }, 200); // tick più frequente per precisione
+    } else {
+      setTimeLeft(remaining);
+    }
+  }, 200);
 
-    return () => clearInterval(interval);
-  }, [isActive, isPaused, waitingNextGroup, showSummary, currentExercise, isRest]);
+  return () => clearInterval(interval);
+}, [currentExercise, isRest, isPaused, waitingNextGroup, showSummary, isActive]);
+
+
+
+
+
 
 
   // Timer automatico
-  useEffect(() => {
+  /* useEffect(() => {
     if (!currentExercise || isPaused || waitingNextGroup || showSummary || !isStarted) return;
 
     if (timeLeft === null && currentExercise.Unita === "SEC" && !isRest) {
@@ -176,17 +185,17 @@ export default function Timer({ workoutData, onExit }) {
           return prev - 1;
         });
       }
-    };
+    }; 
 
     const timer = setInterval(() => {
       if (!isPaused && (currentExercise.Unita === "SEC" || isRest)) {
         tick();
       }
-    }, 1000);
+    }, 200);
 
     return () => clearInterval(timer);
   }, [currentExercise, timeLeft, isRest, isPaused, waitingNextGroup, showSummary, isStarted]);
-
+*/
 
   // funzione beep semplice (freq in Hz, durata in ms)
   const beep = (frequency = 440, duration = 200) => {
