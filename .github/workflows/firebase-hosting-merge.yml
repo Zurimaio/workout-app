@@ -10,6 +10,9 @@ on:
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./workout-timer   # <- qui definisci la working directory
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -21,7 +24,7 @@ jobs:
 
       - name: Install dependencies
         run: npm install
-
+        
       - name: Run tests
         run: npm test -- --watchAll=false
 
