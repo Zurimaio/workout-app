@@ -4,7 +4,7 @@
 
 /* Corpo pagina */
 body {
-    @apply font-sans bg-brand text-offwhite min-h-screen;
+    @apply font-sans bg-brand-light text-offwhite min-h-screen;
 }
 
 button {
@@ -16,9 +16,6 @@ button:hover {
     @apply bg-brand-light;
 }
 
-.card {
-    @apply bg-brand-light text-offwhite p-4 rounded-lg shadow-lg;
-}
 
 a {
     @apply text-offwhite text-brand-dark underline;
