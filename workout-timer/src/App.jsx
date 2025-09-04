@@ -4,9 +4,6 @@ import AdminRoute from "./components/AdminRoute"
 import ProtectedRoute from "./components/ProtectedRoute";
 
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-
-import { db } from "../lib/firebase";
-import { collection, getDocs } from "firebase/firestore";
 import { useAuth } from "./contexts/AuthContext";
 import Login from "./components/Login";
 import Dashboard from "./components/Dashboard";

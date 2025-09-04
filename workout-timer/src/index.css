@@ -10,11 +10,11 @@ body {
 
 button {
     @apply px-4 py-2 rounded-xl shadow-md transition-colors;
-    @apply bg-sage text-brand;
+    @apply bg-brand-dark text-offwhite;
 }
 
 button:hover {
-    @apply bg-sage-dark;
+    @apply bg-brand-light;
 }
 
 .card {
@@ -22,5 +22,5 @@ button:hover {
 }
 
 a {
-    @apply text-sage text-sage-dark underline;
+    @apply text-offwhite text-brand-dark underline;
 }

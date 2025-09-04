@@ -33,7 +33,7 @@ export default function ExerciseList({ exerciseDB, setExerciseDB }) {
   return (
     <div className="space-y-4">
       {Object.keys(exerciseDB).map((ambito) => (
-        <div key={ambito} className="border rounded shadow p-2 bg-white">
+        <div key={ambito} className="bg-brand rounded shadow p-2 ">
           <div
             className="font-bold cursor-pointer flex justify-between items-center"
             onClick={() => toggleAmbito(ambito)}
@@ -44,7 +44,7 @@ export default function ExerciseList({ exerciseDB, setExerciseDB }) {
           {expandedAmbito === ambito && (
             <div className="pl-4 mt-2 space-y-2">
               {Object.keys(exerciseDB[ambito]).map((pilastro) => (
-                <div key={pilastro} className="border rounded p-2 bg-gray-50">
+                <div key={pilastro} className="rounded p-2 bg-brand-light">
                   <div
                     className="font-semibold cursor-pointer flex justify-between items-center"
                     onClick={() => togglePilastro(ambito, pilastro)}
@@ -63,7 +63,7 @@ export default function ExerciseList({ exerciseDB, setExerciseDB }) {
                               onChange={(e) =>
                                 handleExerciseChange(ambito, pilastro, idx, e.target.value)
                               }
-                              className="border px-2 py-1 rounded w-64"
+                              className="border px-2 py-1 rounded w-64 placeholder-text-brand-light text-brand-light"
                             />
                           </li>
                         ))}

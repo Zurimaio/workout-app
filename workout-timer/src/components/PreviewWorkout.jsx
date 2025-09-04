@@ -13,9 +13,14 @@ export default function PreviewWorkout({ workoutData, onStart, onReload }) {
               <li key={idx} className="mb-1">
                 <span className="font-medium">{ex.Esercizio}</span> – 
                 {ex.set} set – {ex.Volume}{ex.Unita} – Riposo {ex.Rest}s
+                <div className="mt-4">
+                  <span className="block text-sm font-semibold mb-1">Note aggiuntive:</span>
+                  <p className="text-gray-700">{ex.Note || "—"}</p>
+                </div>
               </li>
             ))}
           </ul>
+          
         </div>
       ))}
 

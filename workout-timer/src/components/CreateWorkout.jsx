@@ -3,13 +3,16 @@ import { db } from "../../lib/firebase";
 import { doc, getDoc, getDocs, collection, addDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useAuth } from "../contexts/AuthContext"; // Assicurati che il context sia corretto
 
+import UserProfile from "../hooks/UserProfile";
+
+
 export default function CreateWorkout({ selectedUser, onGenerated }) {
   const { user } = useAuth(); // user loggato
   const [exerciseDB, setExerciseDB] = useState({});
   const [groups, setGroups] = useState({});
   const [currentGroup, setCurrentGroup] = useState("1");
   const [userList, setUserList] = useState([]);
-  
+  const { profile, loading } = UserProfile();
   const [currentExercise, setCurrentExercise] = useState({
     Tipologia: "",
     Ambito: "",
@@ -18,7 +21,8 @@ export default function CreateWorkout({ selectedUser, onGenerated }) {
     set: 1,
     Volume: 30,
     Unita: "SEC",
-    Rest: 15
+    Rest: 15, 
+    Note: ""
   });
 
   const [availableAmbiti, setAvailableAmbiti] = useState([]);
@@ -112,7 +116,8 @@ export default function CreateWorkout({ selectedUser, onGenerated }) {
       set: 1,
       Volume: 30,
       Unita: "SEC",
-      Rest: 15
+      Rest: 15, 
+      Note: ""
     });
   };
 
@@ -125,40 +130,50 @@ export default function CreateWorkout({ selectedUser, onGenerated }) {
     onGenerated(groups);
   };
 
- const handleSaveWorkout = async () => {
-  if (!workoutName) return alert("Inserisci un nome per il workout.");
-  if (!user) return alert("Devi essere loggato per salvare il workout.");
-  if (!selectedUser) return alert("Seleziona un utente a cui assegnare il workout.");
+  const handleSaveWorkout = async () => {
+    if (!workoutName) return alert("Inserisci un nome per il workout.");
+    if (!user) return alert("Devi essere loggato per salvare il workout.");
+    if (!selectedUser) return alert("Seleziona un utente a cui assegnare il workout.");
 
-  console.log(selectedUser);
+    console.log(selectedUser);
 
-  try {
-    // riferimento alla sottocollezione dei workout dell’utente selezionato
-    const userWorkoutsRef = collection(db, "workouts", selectedUser.id, "userWorkouts");
+    try {
+      // riferimento alla sottocollezione dei workout dell’utente selezionato
+      const userWorkoutsRef = collection(db, "workouts", selectedUser.id, "userWorkouts");
 
-    // aggiunge un nuovo documento con ID generato da Firestore
-    await addDoc(userWorkoutsRef, {
-      name: workoutName,
-      createdAt: serverTimestamp(),
-      groups
-    });
+      // aggiunge un nuovo documento con ID generato da Firestore
+      await addDoc(userWorkoutsRef, {
+        name: workoutName,
+        createdAt: serverTimestamp(),
+        groups
+      });
 
-    alert(`Workout salvato per ${selectedUser.email}!`);
-    setGroups({});
-    setWorkoutName("");
-    
+      alert(`Workout salvato per ${selectedUser.email}!`);
+      setGroups({});
+      setWorkoutName("");
 
-  } catch (err) {
-    console.error("Errore salvataggio workout:", err);
-    alert("Errore durante il salvataggio!");
-  }
-};
+
+    } catch (err) {
+      console.error("Errore salvataggio workout:", err);
+      alert("Errore durante il salvataggio!");
+    }
+  };
 
   return (
-    <div className="p-4 max-w-xl mx-auto bg-gray-50 rounded shadow">
-      <h2 className="text-xl font-bold mb-2">Crea Workout Avanzato per {selectedUser?.email}</h2>
+    <div className="p-4 max-w-xl mx-auto rounded shadow">
+      <h2 className="text-xl font-bold mb-2">Crea Workout Avanzato per {selectedUser?.name}</h2>
 
       <div className="mb-2">
+
+        <input
+          type="text"
+          placeholder="Nome workout"
+          value={workoutName}
+          onChange={(e) => setWorkoutName(e.target.value)}
+          className="border p-2 rounded mb-2 w-full"
+        />
+
+
         <span className="mr-2">Gruppo corrente: {currentGroup}</span>
         <button
           onClick={handleAddGroup}
@@ -174,13 +189,13 @@ export default function CreateWorkout({ selectedUser, onGenerated }) {
           placeholder="Tipologia"
           value={currentExercise.Tipologia}
           onChange={(e) => handleExerciseChange("Tipologia", e.target.value)}
-          className="border p-2 rounded"
+          className="border p-2 rounded text-brand"
         />
 
         <select
           value={currentExercise.Ambito}
           onChange={(e) => handleExerciseChange("Ambito", e.target.value)}
-          className="border p-2 rounded"
+          className="border p-2 rounded text-brand"
         >
           <option value="">-- Seleziona Ambito --</option>
           {availableAmbiti.map((ambito) => (
@@ -191,7 +206,7 @@ export default function CreateWorkout({ selectedUser, onGenerated }) {
         <select
           value={currentExercise.Pilastro}
           onChange={(e) => handleExerciseChange("Pilastro", e.target.value)}
-          className="border p-2 rounded"
+          className="border p-2 rounded text-brand"
           disabled={!currentExercise.Ambito}
         >
           <option value="">-- Seleziona Pilastro --</option>
@@ -203,7 +218,7 @@ export default function CreateWorkout({ selectedUser, onGenerated }) {
         <select
           value={currentExercise.Esercizio}
           onChange={(e) => handleExerciseChange("Esercizio", e.target.value)}
-          className="border p-2 rounded"
+          className="border p-2 rounded text-brand"
           disabled={!currentExercise.Pilastro}
         >
           <option value="">-- Seleziona Esercizio --</option>
@@ -211,36 +226,65 @@ export default function CreateWorkout({ selectedUser, onGenerated }) {
             <option key={ex} value={ex}>{ex}</option>
           ))}
         </select>
+        <div className="flex flex-wrap gap-4">
+          <div className="flex flex-col flex-1 min-w-[100px]">
+            <span>Set</span>
+            <input
+              type="number"
+              placeholder="Set"
+              value={currentExercise.set}
+              onChange={(e) => handleExerciseChange("set", Number(e.target.value))}
+              className="border p-2 rounded text-brand placeholder-text-brand-light w-full"
+            />
+          </div>
 
-        <input
-          type="number"
-          placeholder="Set"
-          value={currentExercise.set}
-          onChange={(e) => handleExerciseChange("set", Number(e.target.value))}
-          className="border p-2 rounded"
-        />
-        <input
-          type="number"
-          placeholder="Volume"
-          value={currentExercise.Volume}
-          onChange={(e) => handleExerciseChange("Volume", Number(e.target.value))}
-          className="border p-2 rounded"
-        />
-        <select
-          value={currentExercise.Unita}
-          onChange={(e) => handleExerciseChange("Unita", e.target.value)}
-          className="border p-2 rounded"
-        >
-          <option value="SEC">SEC</option>
-          <option value="REPS">REPS</option>
-        </select>
-        <input
-          type="number"
-          placeholder="Rest (sec)"
-          value={currentExercise.Rest}
-          onChange={(e) => handleExerciseChange("Rest", Number(e.target.value))}
-          className="border p-2 rounded"
-        />
+          <div className="flex flex-col flex-1 min-w-[100px]">
+            <span>Volume</span>
+            <input
+              type="number"
+              placeholder="Volume"
+              value={currentExercise.Volume}
+              onChange={(e) => handleExerciseChange("Volume", Number(e.target.value))}
+              className="border p-2 rounded text-brand placeholder-text-brand-light w-full"
+            />
+          </div>
+
+          <div className="flex flex-col flex-1 min-w-[120px]">
+            <span>Unità</span>
+            <select
+              value={currentExercise.Unita}
+              onChange={(e) => handleExerciseChange("Unita", e.target.value)}
+              className="border p-2 rounded text-brand placeholder-text-brand-light w-full"
+            >
+              <option value="SEC">SEC</option>
+              <option value="REPS">REPS</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col flex-1 min-w-[100px]">
+            <span>Rest</span>
+            <input
+              type="number"
+              placeholder="Rest (sec)"
+              value={currentExercise.Rest}
+              onChange={(e) => handleExerciseChange("Rest", Number(e.target.value))}
+              className="border p-2 rounded text-brand-light placeholder-gray-400 w-full"
+            />
+          </div>
+
+
+        </div>
+        
+        <div>
+          <span>Note aggiuntive all'esercizio</span>
+           <textarea
+              placeholder="Note Aggiuntive"
+              value={currentExercise.Note}
+              onChange={(e) => handleExerciseChange("Note", e.target.value)}
+              className="border p-2 rounded text-brand placeholder-text-brand-light w-full"
+            />
+        </div>
+
 
         <button
           onClick={handleAddExercise}
@@ -250,15 +294,9 @@ export default function CreateWorkout({ selectedUser, onGenerated }) {
         </button>
       </div>
 
-      <input
-        type="text"
-        placeholder="Nome workout"
-        value={workoutName}
-        onChange={(e) => setWorkoutName(e.target.value)}
-        className="border p-2 rounded mb-2 w-full"
-      />
 
-   
+
+
 
       <button
         onClick={handleSaveWorkout}
@@ -303,13 +341,6 @@ export default function CreateWorkout({ selectedUser, onGenerated }) {
           </div>
         ))}
       </div>
-
-      <button
-        onClick={handleGenerateJSON}
-        className="bg-green-500 text-white px-4 py-2 rounded shadow hover:bg-green-600 transition mt-4"
-      >
-        Carica Workout
-      </button>
     </div>
   );
 }

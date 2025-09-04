@@ -4,8 +4,10 @@ import { doc, getDoc, getDocs, collection, deleteDoc, setDoc } from "firebase/fi
 import ExerciseList from "./ExerciseList";
 import UploadWorkout from "../UploadWorkout";
 import CreateWorkout from "../CreateWorkout";
-import ProfileMenu from "../ProfileMenu";
 import PreviewWorkout from "../PreviewWorkout";
+import Header from "../Header";
+import UserProfile from "../../hooks/UserProfile";
+import Sidebar from "../Sidebar";
 
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -21,6 +23,7 @@ export default function AdminPanel() {
   const [workoutData, setWorkoutData] = useState(null);
   const [userList, setUserList] = useState([]);
   const [userWorkouts, setUserWorkouts] = useState([]);
+  const {profile, loadingProfile} = UserProfile(); 
 
   // --- Carica gli utenti da Firestore
   useEffect(() => {
@@ -128,46 +131,29 @@ export default function AdminPanel() {
   ];
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-brand-light shadow-none">
       {/* Sidebar mobile toggle */}
       <div className="md:hidden absolute top-4 left-4 z-20">
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="p-2 rounded bg-white shadow"
+          className="p-2 rounded bg-brnad shadow"
         >
           <MdMenu size={24} />
         </button>
       </div>
 
-      {/* Sidebar */}
-      <aside
-        className={`fixed md:relative z-10 w-64 bg-white shadow-lg h-full transform transition-transform duration-300
-          ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}
-      >
-        <div className="h-16 flex items-center justify-center font-bold text-xl border-b">
-          🏋️ Admin Panel
-        </div>
-        <nav className="flex-1 px-2 py-4 space-y-2">
-          {menuItems.map(item => (
-            <button
-              key={item.key}
-              onClick={() => { setView(item.key); setSidebarOpen(false); }}
-              className={`flex items-center gap-2 w-full px-3 py-2 rounded hover:bg-indigo-100 transition ${view === item.key ? "bg-indigo-200 font-semibold" : ""
-                }`}
-            >
-              {item.icon} <span>{item.label}</span>
-            </button>
-          ))}
-        </nav>
-        <div className="p-4 border-t mt-auto">
-          <ProfileMenu />
-        </div>
-      </aside>
+      <Sidebar menuItems={menuItems} sidebarOpen={sidebarOpen} setView={setView} />
 
       {/* Content */}
-      <main className="flex-1 overflow-auto p-6 md:ml-64">
+      <main className="flex-1 overflow-auto p-6 md:ml-4">
+
+        <Header
+          title={`Ciao, ${profile.name} 👋`}
+          subtitle="Ecco i tuoi clienti."
+        />
+
         {view === "users" && (
-          <div className="p-4 bg-white rounded shadow">
+          <div className="p-4 rounded-2xl">
             <h2 className="text-2xl font-bold mb-4">Lista Utenti</h2>
             {userList.length === 0 ? (
               <p>Nessun utente registrato.</p>
@@ -181,7 +167,7 @@ export default function AdminPanel() {
                           setSelectedUser(u);
                           handleSelectUser(u);
                         }}
-                        className="w-full text-left px-4 py-2 rounded bg-indigo-50 hover:bg-indigo-100"
+                        className="w-full text-left px-4 py-2 rounded-1xl hover:bg-brand"
                       >
                         {u.name} {u.role === "admin" && "(Admin)"}
                       </button>
@@ -194,7 +180,7 @@ export default function AdminPanel() {
 
 
         {view === "exerciseDB" && (
-          <div className="p-4 bg-white rounded shadow">
+          <div className="p-4 rounded shadow-none">
             <h2 className="text-2xl font-bold mb-4">Exercise DB</h2>
 
             <div className="mb-4">
@@ -217,10 +203,9 @@ export default function AdminPanel() {
         )}
 
         {view === "profile" && (
-          <div className="p-4 bg-white rounded shadow">
+          <div className="p-4 rounded shadow">
             <h2 className="text-2xl font-bold mb-4">Profilo Admin</h2>
             <p>Email: {user?.email}</p>
-            <p>Ruolo: admin</p>
           </div>
         )}
 
@@ -256,11 +241,11 @@ export default function AdminPanel() {
           <div>
             <button
               onClick={() => setView("users")}
-              className="mb-4 bg-gray-300 text-black px-4 py-2 rounded hover:bg-gray-400"
+              className="mb-4 text-offwhite px-4 py-2 rounded hover:bg-brand-light"
             >
               ← Torna alla lista degli utenti
             </button>
-            <div className="p-4 bg-white rounded shadow">
+            <div className="p-4 rounded">
 
 
               <h2 className="text-2xl font-bold mb-4">Workout di {selectedUser.name}</h2>
@@ -277,7 +262,7 @@ export default function AdminPanel() {
               ) : (
                 <ul className="space-y-2">
                   {userWorkouts.map(w => (
-                    <li key={w.id} className="flex justify-between items-center p-2 border rounded hover:bg-gray-50">
+                    <li key={w.id} className="flex justify-between items-center p-2  bg-brand rounded hover:bg-brand-light shadow">
                       <span>{w.name}</span>
                       <div className="flex gap-2">
                         <button
