@@ -3,7 +3,6 @@
 @tailwind utilities;
 
 /* Corpo pagina */
-
 body {
     @apply font-sans bg-brand text-offwhite min-h-screen;
 }
