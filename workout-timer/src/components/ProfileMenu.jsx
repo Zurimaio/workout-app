@@ -33,10 +33,6 @@ const { user, logout } = useAuth();
     navigate("/login"); // redirect alla pagina di login
   };
 
-useEffect(() => {
-  console.log(user);
-});
-
 
 // --- Carica gli utenti da Firestore
   useEffect(() => {

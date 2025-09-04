@@ -135,8 +135,6 @@ export default function CreateWorkout({ selectedUser, onGenerated }) {
     if (!user) return alert("Devi essere loggato per salvare il workout.");
     if (!selectedUser) return alert("Seleziona un utente a cui assegnare il workout.");
 
-    console.log(selectedUser);
-
     try {
       // riferimento alla sottocollezione dei workout dell’utente selezionato
       const userWorkoutsRef = collection(db, "workouts", selectedUser.id, "userWorkouts");
