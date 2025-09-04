@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { FaPlay, FaPause, FaStop } from "react-icons/fa";
 import { MdNavigateBefore, MdNavigateNext } from "react-icons/md"; // ✅ frecce gemelle
 import { motion, AnimatePresence } from "framer-motion";
+import beepFile from "../../audio/beep.wav"
+
 
 export default function Timer({ workoutData, onExit }) {
   const [currentGroupIndex, setCurrentGroupIndex] = useState(0);
@@ -18,20 +20,44 @@ export default function Timer({ workoutData, onExit }) {
   const [showSummary, setShowSummary] = useState(false);
   const [summaryData, setSummaryData] = useState([]);
   const [totalDuration, setTotalDuration] = useState(0);
-  const beepAudioRef = useRef(null);
+  const beepRef = useRef(null);
+  const wakeLockRef = useRef(null);
+  const [beepLoaded, setBeepLoaded] = useState(false);
+
   const [startTime] = useState(() => Date.now());
 
 
   // 🔔 Inizializza beep audio
   useEffect(() => {
-    beepAudioRef.current = new Audio("../../audio/beep.wav");
+      if (!beepFile) {
+      console.error("Beep file non trovato!");
+      return;
+    }
+
+    const beep = new Audio(beepFile);
+    beepRef.current = beep;
+
+    // Evento oncanplaythrough
+    beep.oncanplaythrough = () => setBeepLoaded(true);
+
+    // Evento onerror
+    beep.onerror = (e) => {
+      console.error("Errore nel caricamento del beep:", e);
+      setBeepLoaded(false);
+    };
+
+    return () => {
+      beepRef.current = null;
+    };
   }, []);
 
   const playBeep = () => {
-    if (beepAudioRef.current) {
-      beepAudioRef.current.currentTime = 0;
-      beepAudioRef.current.play().catch(() => {});
-    }
+    if (beepLoaded && beepRef.current) {
+    beepRef.current.currentTime = 0;
+    beepRef.current.play();
+  } else {
+    console.warn("Beep non caricato, non posso riprodurlo");
+  }
   };
 
     // 🔔 Wake Lock
