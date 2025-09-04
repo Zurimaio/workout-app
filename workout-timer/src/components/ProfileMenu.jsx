@@ -2,6 +2,9 @@ import React, { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { updatePassword } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../../lib/firebase";
+
 
 export default function ProfileMenu() {
 const { user, logout } = useAuth();
@@ -41,9 +44,7 @@ useEffect(() => {
       try {
         const snapshot = await getDocs(collection(db, "users"));
         const userList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        if(userList.id === user.id) {
-          setUserProfile(user.data());
-        }
+        
       } catch (err) {
         console.error("Errore caricamento utenti:", err);
       }

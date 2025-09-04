@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from "react";
+import { FaPlay,FaPause } from "react-icons/fa";
+import { MdNavigateNext, MdArrowBackIos } from "react-icons/md";
+
 
 export default function Timer({ workoutData, onExit }) {
   const [currentGroupIndex, setCurrentGroupIndex] = useState(0);
@@ -182,11 +185,14 @@ export default function Timer({ workoutData, onExit }) {
   }
 
   return (
-    <div className="p-4 text-center max-w-xl mx-auto">
+    <div className="p-4 text-center max-w-xl mx-auto text-offwhite max-h-xl">
       <h1 className="text-2xl font-bold mb-2">Workout in corso</h1>
       <h2 className="text-xl font-semibold mb-1">
         Gruppo {groupIds[currentGroupIndex]} – Set {currentSet} di {currentExercise.set}
       </h2>
+      <h3>
+        {currentExercise.Esercizio}
+      </h3>
 
       <div className="relative w-40 h-40 mx-auto mb-4">
         <svg className="w-40 h-40 transform -rotate-90">
@@ -205,7 +211,7 @@ export default function Timer({ workoutData, onExit }) {
           />
         </svg>
         <div className="absolute inset-0 flex flex-col justify-center items-center">
-          <p className="text-lg font-bold mb-1">{isRest ? "Riposo" : `${currentExercise.Esercizio} (${currentExercise.Pilastro || ""})`}</p>
+          <p className="text-lg font-bold mb-1">{isRest ? "Riposo" : "Work"}</p>
           <p className="text-3xl font-bold text-blue-500">
             {currentExercise.Unita === "SEC" || isRest ? timeLeft + "s" : ""}
           </p>
@@ -241,13 +247,13 @@ export default function Timer({ workoutData, onExit }) {
             className="px-4 py-2 bg-gray-400 text-white rounded shadow hover:bg-gray-500 transition"
             disabled={currentExerciseIndex === 0}
           >
-            ← Esercizio precedente
+            <MdArrowBackIos  />
           </button>
           <button
             onClick={handleNextExercise}
             className="px-4 py-2 bg-blue-500 text-white rounded shadow hover:bg-blue-600 transition"
           >
-            Esercizio successivo →
+            <MdNavigateNext />
           </button>
           <button
             onClick={handleNextSet}
@@ -259,16 +265,19 @@ export default function Timer({ workoutData, onExit }) {
             onClick={() => setIsPaused((prev) => !prev)}
             className="px-4 py-2 bg-yellow-500 text-white rounded shadow hover:bg-yellow-600 transition"
           >
-            {isPaused ? "Riprendi" : "Pausa"}
+            {isPaused ? <FaPlay /> : <FaPause />}
           </button>
-          <button
-            onClick={onExit}
-            className="px-4 py-2 bg-red-500 text-white rounded shadow hover:bg-red-600 transition"
-          >
-            Termina Workout
-          </button>
+          
         </div>
       )}
+      <div className="relative bottom-0 left-50">
+        <button
+          onClick={onExit}
+          className="px-4 py-2 bg-red-500 text-white rounded shadow hover:bg-red-600 transition"
+        >
+          Termina Workout
+        </button>
+      </div>
     </div>
   );
 }

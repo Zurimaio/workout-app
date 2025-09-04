@@ -18,6 +18,10 @@ yarn-error.log*
 # System files
 .DS_Store
 
+# Firebase local emulators
+.firebase/
+.firebaserc
+
 
 #functions
 functions/calisthenics-workout-tra-a0036-firebase-adminsdk-fbsvc-9b488b8b1f.json

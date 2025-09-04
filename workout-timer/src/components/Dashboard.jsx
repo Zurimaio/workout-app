@@ -32,12 +32,12 @@ export default function Dashboard() {
   if (role === "admin") menuItems.push({ key: "admin", label: "Admin Panel", icon: <MdAdminPanelSettings /> });
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-brand">
       {/* Sidebar mobile toggle */}
       <div className="md:hidden absolute top-4 left-4 z-20">
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="p-2 rounded bg-white shadow"
+          className="p-2 rounded bg-sage-dark shadow"
         >
           <MdMenu size={24} />
         </button>
@@ -45,19 +45,19 @@ export default function Dashboard() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed md:relative z-10 w-64 bg-white shadow-lg h-full transform transition-transform duration-300
+        className={`fixed md:relative z-10 w-64 bg-brand-dark shadow-lg h-full transform transition-transform duration-300
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}
       >
-        <div className="h-16 flex items-center justify-center font-bold text-xl border-b">
-          🏋️ WorkoutApp
+        <div className="h-16 flex text-offwhite items-center justify-center font-bold text-xl border-b">
+          🏋️ Elev8
         </div>
         <nav className="flex-1 px-2 py-4 space-y-2">
           {menuItems.map(item => (
             <button
               key={item.key}
               onClick={() => { setView(item.key); setSidebarOpen(false); }}
-              className={`flex items-center gap-2 w-full px-3 py-2 rounded hover:bg-indigo-100 transition ${
-                view === item.key ? "bg-indigo-200 font-semibold" : ""
+              className={`flex items-right gap-2 w-full px-3 py-2 rounded  bg-brand-light hover:bg-brand-dark text-offwhite transition ${
+                view === item.key ? "bg-brand-light font-semibold" : ""
               }`}
             >
               {item.icon} <span>{item.label}</span>
@@ -70,7 +70,7 @@ export default function Dashboard() {
       </aside>
 
       {/* Content area */}
-      <main className="flex-1 overflow-auto p-6 md:ml-64">
+      <main className="flex-1 overflow-auto p-6 md:ml-16">
         {view === "myWorkouts" && (
           <MyWorkouts
             workouts={myWorkouts}
@@ -80,10 +80,10 @@ export default function Dashboard() {
         )}
 
         {view === "profile" && (
-          <div className="p-4 bg-white rounded shadow">
+          <div className="p-4 bg-brand-light text-offwhite rounded shadow">
             <h2 className="text-2xl font-bold mb-4">Profilo</h2>
             <p>Email: {user?.email}</p>
-            <p>Ruolo: {role}</p>
+
           </div>
         )}
 

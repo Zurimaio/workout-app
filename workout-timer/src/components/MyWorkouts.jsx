@@ -37,9 +37,9 @@ useEffect(() => {
 
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 bg-brand-light text-offwhite rounded shadow">
       {workouts.map(w => (
-        <div key={w.id} className="flex justify-between items-center border rounded p-2 hover:bg-gray-100">
+        <div key={w.id} className="flex justify-between items-center rounded shadow p-2 hover:bg-brand-light">
           <span>{w.name || `Workout ${w.id}`}</span>
           <div className="flex gap-2">
             <button

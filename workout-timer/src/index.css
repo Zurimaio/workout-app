@@ -2,10 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Corpo pagina */
+
 body {
-  @apply font-sans bg-gray-50 text-gray-800;
+    @apply font-sans bg-brand text-offwhite min-h-screen;
 }
 
 button {
-  @apply px-4 py-2 rounded-xl shadow-md transition-colors;
+    @apply px-4 py-2 rounded-xl shadow-md transition-colors;
+    @apply bg-sage text-brand;
+}
+
+button:hover {
+    @apply bg-sage-dark;
+}
+
+.card {
+    @apply bg-brand-light text-offwhite p-4 rounded-lg shadow-lg;
+}
+
+a {
+    @apply text-sage text-sage-dark underline;
 }

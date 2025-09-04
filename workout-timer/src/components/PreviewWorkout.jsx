@@ -3,10 +3,10 @@ import React from "react";
 export default function PreviewWorkout({ workoutData, onStart, onReload }) {
   return (
     <div className="p-4 max-w-3xl mx-auto">
-       <h1 className="text-2xl font-bold mb-4">Anteprima Workout</h1>
+       <h1 className="text-2xl font-bold mb-4 text-offwhite">Anteprima Workout</h1>
       
       {Object.entries(workoutData).map(([groupId, exercises]) => (
-        <div key={groupId} className="bg-gray-100 p-4 rounded shadow mb-4">
+        <div key={groupId} className="bg-brand-dark p-4 text-offwhite rounded shadow mb-4">
           <h2 className="font-semibold mb-2">Gruppo {groupId}</h2>
           <ul className="list-disc list-inside">
             {exercises.map((ex, idx) => (
@@ -25,12 +25,6 @@ export default function PreviewWorkout({ workoutData, onStart, onReload }) {
           className="bg-green-500 text-white px-4 py-2 rounded shadow hover:bg-green-600 transition"
         >
           Avvia Workout
-        </button>
-        <button
-          onClick={onReload}
-          className="bg-red-500 text-white px-4 py-2 rounded shadow hover:bg-red-600 transition"
-        >
-          Ricarica Workout
         </button>
       </div>
     </div>
