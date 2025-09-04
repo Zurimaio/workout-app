@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { FaPlay, FaPause, FaStop } from "react-icons/fa";
 import { MdNavigateBefore, MdNavigateNext } from "react-icons/md"; // ✅ frecce gemelle
 import { motion, AnimatePresence } from "framer-motion";
@@ -18,8 +18,44 @@ export default function Timer({ workoutData, onExit }) {
   const [showSummary, setShowSummary] = useState(false);
   const [summaryData, setSummaryData] = useState([]);
   const [totalDuration, setTotalDuration] = useState(0);
-
+  const beepAudioRef = useRef(null);
   const [startTime] = useState(() => Date.now());
+
+
+  // 🔔 Inizializza beep audio
+  useEffect(() => {
+    beepAudioRef.current = new Audio("../../audio/beep.wav");
+  }, []);
+
+  const playBeep = () => {
+    if (beepAudioRef.current) {
+      beepAudioRef.current.currentTime = 0;
+      beepAudioRef.current.play().catch(() => {});
+    }
+  };
+
+    // 🔔 Wake Lock
+  const requestWakeLock = async () => {
+    try {
+      if ("wakeLock" in navigator) {
+        wakeLockRef.current = await navigator.wakeLock.request("screen");
+      }
+    } catch (err) {
+      console.error("WakeLock failed:", err);
+    }
+  };
+
+    const releaseWakeLock = async () => {
+    if (wakeLockRef.current) {
+      await wakeLockRef.current.release();
+      wakeLockRef.current = null;
+    }
+  };
+
+    useEffect(() => {
+    if (isActive) requestWakeLock();
+    return () => releaseWakeLock();
+  }, [isActive]);
 
   // 🔔 Alert reload
   useEffect(() => {
@@ -46,27 +82,50 @@ export default function Timer({ workoutData, onExit }) {
 
   // avvia workout quando finisce countdown
   useEffect(() => {
-    if (prepTime === null) return;
+  if (prepTime === null) return;
+  if (prepTime <= 3 && prepTime > 0) playBeep(); // beep negli ultimi 3 secondi del countdown
+  if (prepTime === 0) {
+    setPrepTime(null);
+    setIsActive(true);
+    setTimeLeft(currentExercise.Volume);
+    return;
+  }
 
-    if (prepTime > 0) {
-      const interval = setInterval(() => {
-        setPrepTime((prev) => {
-          if (prev <= 4 && prev > 0) beep(); // ultimi 3 secondi + 1 beep iniziale
-          return prev - 1;
-        });
-      }, 1000);
-      return () => clearInterval(interval);
-    }
-
-    if (prepTime === 0) {
-      setIsActive(true);
-      setIsStarted(true);
-      setTimeLeft(currentExercise.Unita === "SEC" ? currentExercise.Volume : null);
-      setPrepTime(null);
-    }
-  }, [prepTime, currentExercise]);
+  const timer = setTimeout(() => setPrepTime(prepTime - 1), 1000);
+  return () => clearTimeout(timer);
+}, [prepTime, currentExercise]);
 
 
+
+   // 🔔 Timer principale (affidabile anche in background)
+  useEffect(() => {
+    if (!isActive || isPaused || waitingNextGroup || showSummary) return;
+
+    const start = Date.now();
+    let prevTime = timeLeft;
+
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - start) / 1000);
+      const newTime = (exerciseDuration || 0) - elapsed;
+
+      if (newTime <= 3 && prevTime > 3) playBeep(); // beep ultimi 3 secondi
+      prevTime = newTime;
+
+      if (newTime <= 0) {
+        clearInterval(interval);
+        if (!isRest) {
+          setIsRest(true);
+          setTimeLeft(currentExercise.Rest);
+        } else {
+          handleAdvance();
+        }
+      } else {
+        setTimeLeft(newTime);
+      }
+    }, 200); // tick più frequente per precisione
+
+    return () => clearInterval(interval);
+  }, [isActive, isPaused, waitingNextGroup, showSummary, currentExercise, isRest]);
 
 
   // Timer automatico
@@ -87,7 +146,7 @@ export default function Timer({ workoutData, onExit }) {
         }
       } else {
         setTimeLeft((prev) => {
-          if (prev <= 4 && prev > 0) beep(); // ultimi 3 secondi
+          if (prev <= 4 && prev > 0) playBeep(); // ultimi 3 secondi
           return prev - 1;
         });
       }
@@ -303,7 +362,7 @@ export default function Timer({ workoutData, onExit }) {
       {!isActive && prepTime === null && (
         // --- SCHERMATA INIZIALE ---
         <button
-          onClick={() => setPrepTime(15)}   // avvia countdown fittizio
+          onClick={() => setPrepTime(5)}   // avvia countdown fittizio
           className="px-6 py-3 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition text-lg font-semibold"
         >
           Avvia Workout
