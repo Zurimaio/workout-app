@@ -27,6 +27,8 @@ export default function Dashboard() {
   const [myWorkouts, setMyWorkouts] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { profile, loading } = UserProfile();
+  const [timerActive, setTimerActive] = useState(false);
+
 
   const menuItems = [
     { key: "myWorkouts", label: "Le mie Schede", icon: <MdFitnessCenter /> },
@@ -37,18 +39,10 @@ export default function Dashboard() {
   if (role === "admin") menuItems.push({ key: "admin", label: "Admin Panel", icon: <MdAdminPanelSettings /> });
 
   return (
-    <div className="flex h-screen bg-brand">
-      {/* Sidebar mobile toggle */}
-      <div className="md:hidden absolute top-4 left-4 z-20">
-        <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="p-2 rounded bg-brand-dark shadow"
-        >
-          <MdMenu size={24} />
-        </button>
-      </div>
+   <div className="flex h-screen bg-brand">
+     
 
-    <Sidebar menuItems={menuItems} sidebarOpen={sidebarOpen} setView={setView} />
+    <Sidebar menuItems={menuItems} sidebarOpen={sidebarOpen} setView={setView} setSidebarOpen={setSidebarOpen} />
 
 
 
@@ -64,7 +58,7 @@ export default function Dashboard() {
           <MyWorkouts
             workouts={myWorkouts}
             onPreview={(groups) => { setWorkoutData(groups); setView("preview"); }}
-            onStart={(groups) => { setWorkoutData(groups); setView("timer"); }}
+            onStart={(groups) => { setWorkoutData(groups); setView("timer"); setTimerActive(true)}}
           />
         )}
 
@@ -102,7 +96,7 @@ export default function Dashboard() {
             >
               ← Torna alla Home
             </button>
-            <Timer workoutData={workoutData} onExit={() => setView("myWorkouts")} />
+            <Timer workoutData={workoutData} onExit={() => setView("myWorkouts") && setTimerActive(false)} />
           </div>
         )}
 

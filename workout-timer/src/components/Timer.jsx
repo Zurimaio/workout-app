@@ -11,6 +11,9 @@ export default function Timer({ workoutData, onExit }) {
   const [isRest, setIsRest] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [waitingNextGroup, setWaitingNextGroup] = useState(false);
+  const [isStarted, setIsStarted] = useState(false);
+  const [isActive, setIsActive] = useState(false);       // workout attivo
+  const [prepTime, setPrepTime] = useState(null);        // countdown preparazione
 
   const [showSummary, setShowSummary] = useState(false);
   const [summaryData, setSummaryData] = useState([]);
@@ -40,9 +43,35 @@ export default function Timer({ workoutData, onExit }) {
       ? Math.min(100, ((exerciseDuration - timeLeft) / exerciseDuration) * 100)
       : 0;
 
+
+  // avvia workout quando finisce countdown
+  useEffect(() => {
+    if (prepTime === null) return;
+
+    if (prepTime > 0) {
+      const interval = setInterval(() => {
+        setPrepTime((prev) => {
+          if (prev <= 4 && prev > 0) beep(); // ultimi 3 secondi + 1 beep iniziale
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+
+    if (prepTime === 0) {
+      setIsActive(true);
+      setIsStarted(true);
+      setTimeLeft(currentExercise.Unita === "SEC" ? currentExercise.Volume : null);
+      setPrepTime(null);
+    }
+  }, [prepTime, currentExercise]);
+
+
+
+
   // Timer automatico
   useEffect(() => {
-    if (!currentExercise || isPaused || waitingNextGroup || showSummary) return;
+    if (!currentExercise || isPaused || waitingNextGroup || showSummary || !isStarted) return;
 
     if (timeLeft === null && currentExercise.Unita === "SEC" && !isRest) {
       setTimeLeft(currentExercise.Volume);
@@ -57,7 +86,10 @@ export default function Timer({ workoutData, onExit }) {
           handleAdvance();
         }
       } else {
-        setTimeLeft((prev) => prev - 1);
+        setTimeLeft((prev) => {
+          if (prev <= 4 && prev > 0) beep(); // ultimi 3 secondi
+          return prev - 1;
+        });
       }
     };
 
@@ -68,7 +100,29 @@ export default function Timer({ workoutData, onExit }) {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [currentExercise, timeLeft, isRest, isPaused, waitingNextGroup, showSummary]);
+  }, [currentExercise, timeLeft, isRest, isPaused, waitingNextGroup, showSummary, isStarted]);
+
+
+  // funzione beep semplice (freq in Hz, durata in ms)
+  const beep = (frequency = 440, duration = 200) => {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(frequency, ctx.currentTime);
+    oscillator.start();
+
+    gainNode.gain.setValueAtTime(1, ctx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration / 1000);
+
+    oscillator.stop(ctx.currentTime + duration / 1000);
+  };
+
+
 
   const handleAdvance = () => {
     if (currentExerciseIndex < currentGroup.length - 1) {
@@ -244,138 +298,169 @@ export default function Timer({ workoutData, onExit }) {
   }
 
   return (
-    <div className="p-4 text-center max-w-xl mx-auto text-offwhite">
-      <h1 className="text-2xl font-bold mb-2">Workout in corso</h1>
-      <h2 className="text-lg mb-4">
-        Gruppo {groupIds[currentGroupIndex]} – Set {currentSet} di {currentExercise.set}
-      </h2>
+    <div className="fixed inset-0 bg-brand-dark text-offwhite z-50 flex flex-col items-center justify-center p-4">
 
-      {/* Preview gruppi */}
-      <div className="flex justify-between text-sm text-bg-brand-light mb-4">
-        {groupIds[currentGroupIndex - 1] ? (
-          <button
-            onClick={goToPrevGroup}
-            className="flex items-center gap-1 bg-brand-dark text-offwhite hover:underline"
-          >
-            ← Gruppo {groupIds[currentGroupIndex - 1]}
-          </button>
-        ) : <span />}
-
-        {groupIds[currentGroupIndex + 1] ? (
-          <button
-            onClick={goToNextGroup}
-            className="flex items-center gap-1  bg-brand-dark text-offwhite hover:underline"
-          >
-            Gruppo {groupIds[currentGroupIndex + 1]} →
-          </button>
-        ) : <span />}
-      </div>
-
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={currentGroupIndex} // 🔑 transizione solo tra gruppi
-          initial={{ opacity: 0, x: 100 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -100 }}
-          transition={{ duration: 0.4 }}
-          className="bg-white text-black p-6 rounded-2xl shadow-lg"
-        >
-          <h3 className="text-xl font-semibold mb-2">
-            {isRest ? "Riposo" : currentExercise.Esercizio}
-          </h3>
-
-          <div className="relative w-40 h-40 mx-auto mb-4">
-            <svg className="w-40 h-40 transform -rotate-90">
-              <circle cx="80" cy="80" r="70" stroke="#e5e7eb" strokeWidth="15" fill="none" />
-              <circle
-                cx="80"
-                cy="80"
-                r="70"
-                stroke={isRest ? "#f59e0b" : "#3b82f6"}
-                strokeWidth="15"
-                fill="none"
-                strokeDasharray={2 * Math.PI * 70}
-                strokeDashoffset={2 * Math.PI * 70 * (1 - exerciseProgress / 100)}
-                strokeLinecap="round"
-                style={{ transition: "stroke-dashoffset 1s linear, stroke 0.3s" }}
-              />
-            </svg>
-            <div className="absolute inset-0 flex flex-col justify-center items-center">
-              <p className="text-lg font-bold mb-1">{isRest ? "Riposo" : "Work"}</p>
-              <p className="text-3xl font-bold text-blue-500">
-                {currentExercise.Unita === "SEC" || isRest ? timeLeft + "s" : <span className="">{currentExercise.Volume}reps</span>}
-              </p>
-            </div>
-          </div>
-
-          <div className="w-full bg-gray-300 h-3 rounded mb-4">
-            <div
-              className="bg-green-500 h-3 rounded"
-              style={{ width: `${(currentSet / currentExercise.set) * 100}%` }}
-            />
-          </div>
-
-          {waitingNextGroup ? (
-            <button
-              onClick={handleNextSet}
-              className="px-4 py-2 bg-green-600 text-white rounded shadow hover:bg-green-700 transition"
-            >
-              Avvia prossimo gruppo
-            </button>
-          ) : (
-            <div className="flex flex-wrap justify-center gap-3">
-              {currentExercise.Unita === "REPS" && !isRest && (
-                <button
-                  onClick={handleFinishReps}
-                  className="px-4 py-2 bg-purple-500 text-white rounded shadow hover:bg-purple-600 transition"
-                >
-                  Fine esercizio
-                </button>
-              )}
-              <button
-                onClick={handlePrevExercise}
-                className="px-4 py-2 bg-gray-400 text-white rounded-full shadow hover:bg-gray-500 transition"
-                disabled={currentExerciseIndex === 0 && !isRest}
-              >
-                <MdNavigateBefore size={28} />
-              </button>
-              <button
-                onClick={handleNextExercise}
-                className="px-4 py-2 bg-blue-500 text-white rounded-full shadow hover:bg-blue-600 transition"
-              >
-                <MdNavigateNext size={28} />
-              </button>
-              <button
-                onClick={handleNextSet}
-                className="px-4 py-2 bg-purple-500 text-white rounded shadow hover:bg-purple-600 transition"
-              >
-                Prossimo set
-              </button>
-              <button
-                onClick={() => setIsPaused((prev) => !prev)}
-                className="px-4 py-2 bg-yellow-500 text-white rounded-full shadow hover:bg-yellow-600 transition"
-              >
-                {isPaused ? <FaPlay size={20} /> : <FaPause size={20} />}
-              </button>
-
-                <div className="mt-4">
-                  <span className="block text-sm font-semibold mb-1">Note aggiuntive:</span>
-                  <p className="text-gray-700">{currentExercise.Note || "—"}</p>
-                </div>
-
-            </div>
-          )}
-        </motion.div>
-      </AnimatePresence>
-
-      <div className="mt-6">
+      {!isActive && prepTime === null && (
+        // --- SCHERMATA INIZIALE ---
         <button
-          onClick={confirmExit}
-          className="px-4 py-2 bg-red-500 text-white rounded shadow hover:bg-red-600 transition flex items-center gap-2 mx-auto"
+          onClick={() => setPrepTime(15)}   // avvia countdown fittizio
+          className="px-6 py-3 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition text-lg font-semibold"
         >
-          <FaStop /> Termina Workout
+          Avvia Workout
         </button>
-      </div>
+      )}
+
+      {/* --- COUNTDOWN PREPARATORIO --- */}
+      {prepTime !== null && prepTime > 0 && (
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Preparati!</h1>
+          <p className="text-6xl font-extrabold text-yellow-400">{prepTime}</p>
+        </div>
+      )}
+
+      {isActive && (
+        <>
+          <h1 className="text-2xl font-bold mb-2">Workout in corso</h1>
+          <h2 className="text-lg mb-4">
+            Gruppo {groupIds[currentGroupIndex]} – Set {currentSet} di {currentExercise.set}
+          </h2>
+
+          {/* Preview gruppi */}
+          <div className="flex justify-between text-sm text-bg-brand-light mb-4">
+            {groupIds[currentGroupIndex - 1] ? (
+              <button
+                onClick={goToPrevGroup}
+                className="flex items-center gap-1 bg-brand-dark text-offwhite hover:underline"
+              >
+                ← Gruppo {groupIds[currentGroupIndex - 1]}
+              </button>
+            ) : <span />}
+
+            {groupIds[currentGroupIndex + 1] ? (
+              <button
+                onClick={goToNextGroup}
+                className="flex items-center gap-1  bg-brand-dark text-offwhite hover:underline"
+              >
+                Gruppo {groupIds[currentGroupIndex + 1]} →
+              </button>
+            ) : <span />}
+          </div>
+
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentGroupIndex} // 🔑 transizione solo tra gruppi
+              initial={{ opacity: 0, x: 100 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -100 }}
+              transition={{ duration: 0.4 }}
+              className="bg-white text-black p-6 rounded-2xl shadow-lg"
+            >
+
+
+
+              <h3 className="text-xl font-semibold mb-2">
+                {isRest ? "Riposo" : currentExercise.Esercizio}
+              </h3>
+
+              <div className="relative w-40 h-40 mx-auto mb-4">
+                <svg className="w-40 h-40 transform -rotate-90">
+                  <circle cx="80" cy="80" r="70" stroke="#e5e7eb" strokeWidth="15" fill="none" />
+                  <circle
+                    cx="80"
+                    cy="80"
+                    r="70"
+                    stroke={isRest ? "#f59e0b" : "#3b82f6"}
+                    strokeWidth="15"
+                    fill="none"
+                    strokeDasharray={2 * Math.PI * 70}
+                    strokeDashoffset={2 * Math.PI * 70 * (1 - exerciseProgress / 100)}
+                    strokeLinecap="round"
+                    style={{ transition: "stroke-dashoffset 1s linear, stroke 0.3s" }}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col justify-center items-center">
+                  <p className="text-lg font-bold mb-1">{isRest ? "Riposo" : "Work"}</p>
+                  <p className="text-3xl font-bold text-blue-500">
+                    {currentExercise.Unita === "SEC" || isRest ? timeLeft + "s" : <span className="">{currentExercise.Volume}reps</span>}
+                  </p>
+                </div>
+              </div>
+
+              <div className="w-full bg-gray-300 h-3 rounded mb-4">
+                <div
+                  className="bg-green-500 h-3 rounded"
+                  style={{ width: `${(currentSet / currentExercise.set) * 100}%` }}
+                />
+              </div>
+
+              {waitingNextGroup ? (
+                <button
+                  onClick={handleNextSet}
+                  className="px-4 py-2 bg-green-600 text-white rounded shadow hover:bg-green-700 transition"
+                >
+                  Avvia prossimo gruppo
+                </button>
+              ) : (
+                <>
+                  <div className="flex flex-wrap justify-center gap-4">
+                    {currentExercise.Unita === "REPS" && !isRest && (
+                      <button
+                        onClick={handleFinishReps}
+                        className="px-4 py-2 text-sm bg-purple-500 text-white rounded shadow hover:bg-purple-600 transition"
+                      >
+                        Fine esercizio
+                      </button>
+                    )}
+
+                    <button
+                      onClick={handlePrevExercise}
+                      className="w-12 h-12 flex items-center justify-center bg-gray-400 text-white rounded-full shadow hover:bg-gray-500 transition"
+                      disabled={currentExerciseIndex === 0 && !isRest}
+                    >
+                      <MdNavigateBefore size={28} />
+                    </button>
+
+                    <button
+                      onClick={handleNextExercise}
+                      className="w-12 h-12 flex items-center justify-center bg-blue-500 text-white rounded-full shadow hover:bg-blue-600 transition"
+                    >
+                      <MdNavigateNext size={28} />
+                    </button>
+
+                    <button
+                      onClick={handleNextSet}
+                      className="px-4 py-2 text-sm bg-purple-500 text-white rounded shadow hover:bg-purple-600 transition"
+                    >
+                      Prossimo set
+                    </button>
+
+                    <button
+                      onClick={() => setIsPaused((prev) => !prev)}
+                      className="w-12 h-12 flex items-center justify-center bg-yellow-500 text-white rounded-full shadow hover:bg-yellow-600 transition"
+                    >
+                      {isPaused ? <FaPlay size={22} /> : <FaPause size={22} />}
+                    </button>
+                  </div>
+
+                  {/* Note aggiuntive */}
+                  <div className="mt-4 text-center">
+                    <span className="block text-sm font-semibold mb-1">Note aggiuntive:</span>
+                    <p className="text-gray-700">{currentExercise.Note || "—"}</p>
+                  </div>
+                </>
+              )}
+            </motion.div>
+          </AnimatePresence>
+
+          <div className="mt-6">
+            <button
+              onClick={confirmExit}
+              className="px-4 py-2 bg-red-500 text-white rounded shadow hover:bg-red-600 transition flex items-center gap-2 mx-auto"
+            >
+              <FaStop /> Termina Workout
+            </button>
+          </div>
+        </>)}
     </div>
   );
 }

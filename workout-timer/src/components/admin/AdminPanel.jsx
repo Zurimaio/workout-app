@@ -18,12 +18,14 @@ export default function AdminPanel() {
   const [exerciseDB, setExerciseDB] = useState({});
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("users"); // users, exerciseDB, profile, create, upload
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
+/*   const [sidebarOpen, setSidebarOpen] = useState(false);
+ */  const [selectedUser, setSelectedUser] = useState(null);
   const [workoutData, setWorkoutData] = useState(null);
   const [userList, setUserList] = useState([]);
   const [userWorkouts, setUserWorkouts] = useState([]);
   const {profile, loadingProfile} = UserProfile(); 
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  
 
   // --- Carica gli utenti da Firestore
   useEffect(() => {
@@ -142,7 +144,7 @@ export default function AdminPanel() {
         </button>
       </div>
 
-      <Sidebar menuItems={menuItems} sidebarOpen={sidebarOpen} setView={setView} />
+    <Sidebar menuItems={menuItems} sidebarOpen={sidebarOpen} setView={setView} setSidebarOpen={setSidebarOpen} />
 
       {/* Content */}
       <main className="flex-1 overflow-auto p-6 md:ml-4">
