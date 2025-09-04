@@ -40,7 +40,15 @@ export default function Dashboard() {
 
   return (
    <div className="flex h-screen bg-brand">
-     
+    {/* Sidebar mobile toggle */}
+      <div className="md:hidden absolute top-4 left-4 z-20">
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="p-2 rounded bg-brnad shadow"
+        >
+          <MdMenu size={24} />
+        </button>
+      </div>
 
     <Sidebar menuItems={menuItems} sidebarOpen={sidebarOpen} setView={setView} setSidebarOpen={setSidebarOpen} />
 
