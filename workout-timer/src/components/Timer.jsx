@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef, useReducer, useCallback } from "rea
 import { FaPlay, FaPause, FaStop } from "react-icons/fa";
 import { MdNavigateBefore, MdNavigateNext } from "react-icons/md";
 import { motion, AnimatePresence } from "framer-motion";
+import TimerWorker from '../utils/timer.worker.js?worker';
 
-// Definizione degli stati del timer
+
 const TIMER_STATES = {
   IDLE: 'idle',
   PREPARING: 'preparing',
@@ -14,18 +15,15 @@ const TIMER_STATES = {
   FINISHED: 'finished',
 };
 
-// Funzione reducer per gestire lo stato del timer
+// Funzione reducer per gestire solo lo stato del timer
 const timerReducer = (state, action) => {
   switch (action.type) {
     case 'START_PREP':
-      return { ...state, state: TIMER_STATES.PREPARING, timeRemaining: action.payload };
-    case 'ADVANCE_PREP':
-      return { ...state, timeRemaining: state.timeRemaining - 1 };
+      return { ...state, state: TIMER_STATES.PREPARING };
     case 'START_EXERCISE':
       return {
         ...state,
         state: TIMER_STATES.RUNNING,
-        timeRemaining: action.payload.duration,
         currentExerciseIndex: action.payload.exerciseIndex,
         isRest: false,
       };
@@ -33,21 +31,20 @@ const timerReducer = (state, action) => {
       return {
         ...state,
         state: TIMER_STATES.RESTING,
-        timeRemaining: action.payload.duration,
         isRest: true,
       };
     case 'PAUSE':
       return { ...state, state: TIMER_STATES.PAUSED };
     case 'RESUME':
-      return { ...state, state: state.isRest ? TIMER_STATES.RESTING : TIMER_STATES.RUNNING };
-    case 'UPDATE_TIME':
-      return { ...state, timeRemaining: action.payload };
+      return {
+        ...state,
+        state: state.isRest ? TIMER_STATES.RESTING : TIMER_STATES.RUNNING,
+      };
     case 'NEXT_EXERCISE':
       return {
         ...state,
         currentExerciseIndex: state.currentExerciseIndex + 1,
         isRest: false,
-        timeRemaining: action.payload.duration,
       };
     case 'NEXT_SET':
       return {
@@ -55,7 +52,6 @@ const timerReducer = (state, action) => {
         currentExerciseIndex: 0,
         currentSet: state.currentSet + 1,
         isRest: false,
-        timeRemaining: action.payload.duration,
       };
     case 'NEXT_GROUP':
       return {
@@ -65,7 +61,6 @@ const timerReducer = (state, action) => {
         currentSet: 1,
         state: TIMER_STATES.RUNNING,
         isRest: false,
-        timeRemaining: action.payload.duration,
       };
     case 'FINISH_WORKOUT':
       return { ...state, state: TIMER_STATES.FINISHED };
@@ -79,28 +74,10 @@ const timerReducer = (state, action) => {
         currentExerciseIndex: action.payload.exerciseIndex,
         isRest: false,
         state: TIMER_STATES.PAUSED,
-        timeRemaining: action.payload.duration,
       };
     default:
       return state;
   }
-};
-
-const playBeep = (frequency = 440, duration = 200) => {
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
-  const oscillator = ctx.createOscillator();
-  const gainNode = ctx.createGain();
-  
-  oscillator.connect(gainNode);
-  gainNode.connect(ctx.destination);
-  oscillator.type = "sine";
-  oscillator.frequency.setValueAtTime(frequency, ctx.currentTime);
-  oscillator.start();
-  
-  gainNode.gain.setValueAtTime(1, ctx.currentTime);
-  gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration / 1000);
-  
-  oscillator.stop(ctx.currentTime + duration / 1000);
 };
 
 export default function Timer({ workoutData, onExit }) {
@@ -110,31 +87,156 @@ export default function Timer({ workoutData, onExit }) {
     currentGroupIndex: 0,
     currentExerciseIndex: 0,
     currentSet: 1,
-    timeRemaining: null,
     isRest: false,
     startTime: Date.now(),
   });
 
+  const [timeRemaining, setTimeRemaining] = useState(null);
   const {
     state: timerState,
     currentGroupIndex,
     currentExerciseIndex,
     currentSet,
-    timeRemaining,
     isRest,
     startTime,
   } = state;
 
   const currentGroup = workoutData[groupIds[currentGroupIndex]];
   const currentExercise = currentGroup?.[currentExerciseIndex];
+  const timerWorkerRef = useRef(null);
+  const handleAdvanceRef = useRef(null);
+  const [workerReady, setWorkerReady] = useState(false);
 
-  // Gestione Wake Lock
+  const audioContextRef = useRef(null);
+
+  const getAudioContext = () => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    return audioContextRef.current;
+  };
+
+  const playBeep = useCallback((frequency = 440, duration = 200) => {
+    try {
+      const ctx = getAudioContext();
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(frequency, ctx.currentTime);
+      oscillator.start();
+      
+      gainNode.gain.setValueAtTime(1, ctx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration / 1000);
+      
+      oscillator.stop(ctx.currentTime + duration / 1000);
+    } catch (e) {
+      console.error("Errore nella riproduzione del beep:", e);
+    }
+  }, []);
+
+  const handleAdvance = useCallback(() => {
+
+    if (timerState === TIMER_STATES.PREPARING) {
+    // Avvia il primo esercizio
+    const firstExercise = currentGroup[0];
+    const duration = firstExercise.Unita === "SEC" ? firstExercise.Volume : null;
+    dispatch({ type: 'START_EXERCISE', payload: { exerciseIndex: 0 } });
+    if (duration !== null) {
+      setTimeRemaining(duration); // <-- inizializza timer del primo esercizio
+      timerWorkerRef.current.postMessage({ type: 'START_TIMER', payload: duration });
+    }
+    return;
+  }
+
+
+    if (isRest) {
+      const nextExerciseIndex = currentExerciseIndex + 1;
+      if (nextExerciseIndex < currentGroup.length) {
+        const nextExercise = currentGroup[nextExerciseIndex];
+        const duration = nextExercise.Unita === "SEC" ? nextExercise.Volume : null;
+        dispatch({ type: 'NEXT_EXERCISE', payload: { duration } });
+        if (duration !== null) {
+          timerWorkerRef.current.postMessage({ type: 'START_TIMER', payload: duration });
+        } else {
+          timerWorkerRef.current.postMessage({ type: 'PAUSE_TIMER' });
+        }
+      } else if (currentSet < currentExercise.set) {
+        const firstExerciseInSet = currentGroup[0];
+        const duration = firstExerciseInSet.Unita === "SEC" ? firstExerciseInSet.Volume : null;
+        dispatch({ type: 'NEXT_SET', payload: { duration } });
+        if (duration !== null) {
+          timerWorkerRef.current.postMessage({ type: 'START_TIMER', payload: duration });
+        } else {
+          timerWorkerRef.current.postMessage({ type: 'PAUSE_TIMER' });
+        }
+      } else if (currentGroupIndex < groupIds.length - 1) {
+        dispatch({ type: 'TOGGLE_WAITING_GROUP' });
+        dispatch({ type: 'PAUSE' });
+        timerWorkerRef.current.postMessage({ type: 'PAUSE_TIMER' });
+      } else {
+        dispatch({ type: 'FINISH_WORKOUT' });
+        timerWorkerRef.current.postMessage({ type: 'STOP_TIMER' });
+      }
+    } else {
+      const restDuration = currentExercise.Rest;
+      dispatch({ type: 'START_REST', payload: { duration: restDuration } });
+      timerWorkerRef.current.postMessage({ type: 'START_TIMER', payload: restDuration });
+    }
+  }, [currentGroupIndex, currentExerciseIndex, currentSet, isRest, currentGroup, currentExercise, groupIds, timerState]);
+
+  useEffect(() => {
+    timerWorkerRef.current = new TimerWorker();
+
+    timerWorkerRef.current.onmessage = (e) => {
+      const { type, payload } = e.data;
+
+
+      if (type === 'UPDATE_TIME') {
+        setTimeRemaining(payload);
+
+        if (payload > 0 && payload <= 3) {
+          playBeep(440, 200);
+        }
+      } else if (type === 'TIMER_END') {
+        handleAdvance();
+      }  else if(type === 'DEBUG') {
+      console.log('Worker:', payload);
+    }
+    };
+
+    setWorkerReady(true); // Worker pronto
+
+
+    return () => {
+      if (timerWorkerRef.current) {
+          timerWorkerRef.current.terminate();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+        audioContextRef.current = null;
+      }
+    };
+  }, []);
+
   const wakeLockRef = useRef(null);
   useEffect(() => {
     const requestWakeLock = async () => {
       try {
-        if ("wakeLock" in navigator && timerState === TIMER_STATES.RUNNING) {
-          wakeLockRef.current = await navigator.wakeLock.request("screen");
+        if ("wakeLock" in navigator && (timerState === TIMER_STATES.RUNNING || timerState === TIMER_STATES.RESTING)) {
+          if (!wakeLockRef.current) {
+            wakeLockRef.current = await navigator.wakeLock.request("screen");
+          }
+        } else if (wakeLockRef.current) {
+          wakeLockRef.current.release();
+          wakeLockRef.current = null;
         }
       } catch (err) {
         console.error("WakeLock failed:", err);
@@ -144,134 +246,92 @@ export default function Timer({ workoutData, onExit }) {
     return () => wakeLockRef.current?.release();
   }, [timerState]);
 
-  // Gestione timer principale (requestAnimationFrame)
-  const lastTickRef = useRef(null);
-  const animationFrameIdRef = useRef(null);
-
-  const startTimer = useCallback(() => {
-    lastTickRef.current = Date.now();
-    const tick = () => {
-      if (timerState === TIMER_STATES.PAUSED || timerState === TIMER_STATES.IDLE || timerState === TIMER_STATES.FINISHED || timerState === TIMER_STATES.WAITING_NEXT_GROUP) {
-        return;
-      }
-      
-      const now = Date.now();
-      const elapsed = (now - lastTickRef.current) / 1000;
-      let newTime = Math.max(0, timeRemaining - elapsed);
-      
-      if (newTime <= 3 && newTime > 0 && Math.ceil(newTime) !== Math.ceil(timeRemaining)) {
-        playBeep(440, 200);
-      }
-      
-      if (newTime === 0) {
-        handleAdvance();
-      } else {
-        dispatch({ type: 'UPDATE_TIME', payload: newTime });
-        lastTickRef.current = now;
-      }
-      
-      animationFrameIdRef.current = requestAnimationFrame(tick);
-    };
-    
-    animationFrameIdRef.current = requestAnimationFrame(tick);
-  }, [timerState, timeRemaining, isRest]); // dipendenze essenziali
-
-  useEffect(() => {
-    if (timerState === TIMER_STATES.RUNNING || timerState === TIMER_STATES.RESTING) {
-      startTimer();
-    } else {
-      cancelAnimationFrame(animationFrameIdRef.current);
-    }
-  }, [timerState, startTimer]);
-
-
-  // Gestione countdown di preparazione
-  useEffect(() => {
-    if (timerState !== TIMER_STATES.PREPARING || timeRemaining === null) return;
-    
-    if (timeRemaining <= 3 && timeRemaining > 0) playBeep(440, 200);
-
-    const prepTimer = setTimeout(() => {
-      if (timeRemaining === 1) {
-        const initialDuration = currentExercise.Unita === "SEC" ? currentExercise.Volume : null;
-        dispatch({ type: 'START_EXERCISE', payload: { duration: initialDuration, exerciseIndex: currentExerciseIndex } });
-      } else {
-        dispatch({ type: 'ADVANCE_PREP' });
-      }
-    }, 1000);
-    
-    return () => clearTimeout(prepTimer);
-  }, [timerState, timeRemaining, currentExercise, currentExerciseIndex]);
-
-
-  const handleAdvance = useCallback(() => {
-    if (isRest) {
-      const nextExerciseIndex = currentExerciseIndex + 1;
-      if (nextExerciseIndex < currentGroup.length) {
-        const nextExercise = currentGroup[nextExerciseIndex];
-        const duration = nextExercise.Unita === "SEC" ? nextExercise.Volume : null;
-        dispatch({ type: 'NEXT_EXERCISE', payload: { duration } });
-      } else if (currentSet < currentExercise.set) {
-        const firstExerciseInSet = currentGroup[0];
-        const duration = firstExerciseInSet.Unita === "SEC" ? firstExerciseInSet.Volume : null;
-        dispatch({ type: 'NEXT_SET', payload: { duration } });
-      } else if (currentGroupIndex < groupIds.length - 1) {
-        dispatch({ type: 'TOGGLE_WAITING_GROUP' });
-        dispatch({ type: 'PAUSE' });
-      } else {
-        dispatch({ type: 'FINISH_WORKOUT' });
-      }
-    } else {
-      const restDuration = currentExercise.Rest;
-      dispatch({ type: 'START_REST', payload: { duration: restDuration } });
-    }
-  }, [currentGroupIndex, currentExerciseIndex, currentSet, isRest, currentGroup, currentExercise, groupIds]);
-
   const handleManualAdvance = () => {
     if (isRest) {
       handleAdvance();
     } else if (currentExercise.Unita === "REPS") {
-      dispatch({ type: 'START_REST', payload: { duration: currentExercise.Rest } });
+      dispatch({ type: 'START_REST' });
+      timerWorkerRef.current.postMessage({ type: 'START_TIMER', payload: currentExercise.Rest });
     }
   };
 
   const handleStartWorkout = () => {
-    dispatch({ type: 'START_PREP', payload: 5 });
-  };
+    if (!workerReady) {console.log("Worker non pronto"); return; }// assicuriamoci che il worker sia pronto
+    
+    dispatch({ type: 'START_PREP' });
+    const prepTime = 5;
+    setTimeRemaining(prepTime);
+   };
+
+  useEffect(() => {
+  if (timerState === TIMER_STATES.PREPARING && timerWorkerRef.current) {
+    timerWorkerRef.current.postMessage({ type: 'START_TIMER', payload: 5 });
+  }
+}, [timerState]);
 
   const handlePauseResume = () => {
     if (timerState === TIMER_STATES.PAUSED) {
-      dispatch({ type: 'RESUME' });
+        dispatch({ type: 'RESUME' });
+        if (timeRemaining !== null) {
+            timerWorkerRef.current.postMessage({ type: 'RESUME_TIMER', payload: timeRemaining });
+        }
     } else {
-      dispatch({ type: 'PAUSE' });
+        dispatch({ type: 'PAUSE' });
+        timerWorkerRef.current.postMessage({ type: 'PAUSE_TIMER' });
     }
   };
 
+  const handleStopWorkout = () => {
+    timerWorkerRef.current.postMessage({ type: 'STOP_TIMER' });
+    onExit();
+  };
+
   const handlePrev = () => {
-    // Logica per tornare indietro (semplificata)
     if (isRest) {
-      dispatch({ type: 'START_EXERCISE', payload: { duration: currentExercise.Volume, exerciseIndex: currentExerciseIndex } });
+      const newTimeRemaining = currentExercise.Unita === "SEC" ? currentExercise.Volume : null;
+      dispatch({ type: 'START_EXERCISE', payload: { duration: newTimeRemaining, exerciseIndex: currentExerciseIndex } });
+      if (newTimeRemaining !== null) {
+        timerWorkerRef.current.postMessage({ type: 'RESUME_TIMER', payload: newTimeRemaining });
+      } else {
+        timerWorkerRef.current.postMessage({ type: 'PAUSE_TIMER' });
+      }
     } else if (currentExerciseIndex > 0) {
       const prev = currentGroup[currentExerciseIndex - 1];
-      dispatch({ type: 'GOTO_PREV_EXERCISE', payload: { groupIndex: currentGroupIndex, set: currentSet, exerciseIndex: currentExerciseIndex - 1, duration: prev.Unita === 'SEC' ? prev.Volume : null }});
+      const newTimeRemaining = prev.Unita === 'SEC' ? prev.Volume : null;
+      dispatch({ type: 'GOTO_PREV_EXERCISE', payload: { groupIndex: currentGroupIndex, set: currentSet, exerciseIndex: currentExerciseIndex - 1, duration: newTimeRemaining }});
+      if (newTimeRemaining !== null) {
+        timerWorkerRef.current.postMessage({ type: 'RESUME_TIMER', payload: newTimeRemaining });
+      } else {
+        timerWorkerRef.current.postMessage({ type: 'PAUSE_TIMER' });
+      }
     }
-  };
+};
   
   const handleNextGroup = () => {
     const nextGroupIndex = currentGroupIndex + 1;
     if (nextGroupIndex < groupIds.length) {
-      const nextGroup = workoutData[groupIds[nextGroupIndex]];
-      const duration = nextGroup[0].Unita === "SEC" ? nextGroup[0].Volume : null;
-      dispatch({ type: 'NEXT_GROUP', payload: { duration } });
+        const nextGroup = workoutData[groupIds[nextGroupIndex]];
+        const duration = nextGroup[0].Unita === "SEC" ? nextGroup[0].Volume : null;
+        dispatch({ type: 'NEXT_GROUP', payload: { duration } });
+        if (duration !== null) {
+            timerWorkerRef.current.postMessage({ type: 'START_TIMER', payload: duration });
+        } else {
+            timerWorkerRef.current.postMessage({ type: 'PAUSE_TIMER' });
+        }
     }
   };
-  
+
   const handlePrevGroup = () => {
-     const prevGroupIndex = currentGroupIndex - 1;
+    const prevGroupIndex = currentGroupIndex - 1;
     if (prevGroupIndex >= 0) {
-       const prevGroup = workoutData[groupIds[prevGroupIndex]];
-      const duration = prevGroup[0].Unita === "SEC" ? prevGroup[0].Volume : null;
-      dispatch({ type: 'GOTO_PREV_EXERCISE', payload: { groupIndex: prevGroupIndex, set: 1, exerciseIndex: 0, duration: duration }});
+        const prevGroup = workoutData[groupIds[prevGroupIndex]];
+        const duration = prevGroup[0].Unita === "SEC" ? prevGroup[0].Volume : null;
+        dispatch({ type: 'GOTO_PREV_EXERCISE', payload: { groupIndex: prevGroupIndex, set: 1, exerciseIndex: 0, duration: duration }});
+        if (duration !== null) {
+            timerWorkerRef.current.postMessage({ type: 'RESUME_TIMER', payload: duration });
+        } else {
+            timerWorkerRef.current.postMessage({ type: 'PAUSE_TIMER' });
+        }
     }
   };
 
@@ -283,7 +343,6 @@ export default function Timer({ workoutData, onExit }) {
 
   if (timerState === TIMER_STATES.FINISHED) {
     const totalDuration = Math.floor((Date.now() - startTime) / 1000);
-    // Render del riassunto, che puoi mantenere come era
     return (
       <div className="p-4 max-w-xl mx-auto text-offwhite">
         <h1 className="text-2xl font-bold mb-4 ">Workout completato! 💪</h1>
@@ -409,7 +468,7 @@ export default function Timer({ workoutData, onExit }) {
 
           <div className="mt-6">
             <button
-              onClick={onExit}
+              onClick={handleStopWorkout}
               className="px-4 py-2 bg-red-500 text-white rounded shadow hover:bg-red-600 transition flex items-center gap-2 mx-auto"
             >
               <FaStop /> Termina Workout
