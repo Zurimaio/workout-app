@@ -57,12 +57,12 @@ export default function MyWorkouts({ onPreview, onStart }) {
               >
                 Preview
               </button>
-              <button
-                onClick={() => onStart(w.groups)}
+              {/* <button
+                onClick={() => {onStart(w.groups); } }
                 className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
               >
                 Avvia
-              </button>
+              </button> */}
             </div>
           </div>
         ))}
