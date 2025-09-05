@@ -1,8 +1,23 @@
-import React from "react";
+import {React, useRef} from "react";
 
 export default function PreviewWorkout({ workoutData, onStart, onReload }) {
+    const containerRef = useRef(null);
+
+  const handleFullScreen = () => {
+    if (containerRef.current) {
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      } else {
+        containerRef.current.requestFullscreen().catch((err) => {
+          console.error("Errore nel full screen:", err);
+        });
+      }
+    }
+  };
+
+
   return (
-    <div className="p-4 max-w-3xl mx-auto">
+    <div ref={containerRef} className="p-4 max-w-3xl mx-auto">
        <h1 className="text-2xl font-bold mb-4 text-offwhite">Anteprima Workout</h1>
       
       {Object.entries(workoutData).map(([groupId, exercises]) => (
@@ -29,7 +44,14 @@ export default function PreviewWorkout({ workoutData, onStart, onReload }) {
           onClick={onStart}
           className="bg-green-500 text-white px-4 py-2 rounded shadow hover:bg-green-600 transition"
         >
-          Avvia Workout
+          Avvia Workout (alfa-version)
+        </button>
+
+        <button
+          onClick={handleFullScreen}
+          className="bg-blue-500 text-white px-4 py-2 rounded shadow hover:bg-blue-600 transition"
+        >
+          Full Screen
         </button>
       </div>
     </div>
