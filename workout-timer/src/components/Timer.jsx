@@ -19,7 +19,7 @@ const TIMER_STATES = {
 const timerReducer = (state, action) => {
   switch (action.type) {
     case 'START_PREP':
-      return { ...state, state: TIMER_STATES.PREPARING };
+      return { ...state, state: TIMER_STATES.PREPARING, startTime: Date.now() };
     case 'START_EXERCISE':
       return {
         ...state,
@@ -101,6 +101,12 @@ export default function Timer({ workoutData, onExit }) {
     startTime,
   } = state;
 
+  if (!groupIds.length) {
+  return (
+    <div className="p-4">Nessun workout fornito.</div>
+  );
+}
+
   const currentGroup = workoutData[groupIds[currentGroupIndex]];
   const currentExercise = currentGroup?.[currentExerciseIndex];
   const timerWorkerRef = useRef(null);
@@ -115,6 +121,14 @@ export default function Timer({ workoutData, onExit }) {
     }
     return audioContextRef.current;
   };
+
+  const postToWorker = (msg) => {
+  if (!timerWorkerRef.current) {
+    console.warn('Worker non pronto:', msg);
+    return;
+  }
+  timerWorkerRef.current.postMessage(msg); // ✅ giusto
+};
 
   const playBeep = useCallback((frequency = 440, duration = 200) => {
     try {
@@ -142,11 +156,12 @@ export default function Timer({ workoutData, onExit }) {
     if (timerState === TIMER_STATES.PREPARING) {
     // Avvia il primo esercizio
     const firstExercise = currentGroup[0];
+    console.log("primo esercizi:", firstExercise)
     const duration = firstExercise.Unita === "SEC" ? firstExercise.Volume : null;
     dispatch({ type: 'START_EXERCISE', payload: { exerciseIndex: 0 } });
     if (duration !== null) {
       setTimeRemaining(duration); // <-- inizializza timer del primo esercizio
-      timerWorkerRef.current.postMessage({ type: 'START_TIMER', payload: duration });
+      postToWorker({ type: 'START_TIMER', payload: duration });
     }
     return;
   }
@@ -159,31 +174,30 @@ export default function Timer({ workoutData, onExit }) {
         const duration = nextExercise.Unita === "SEC" ? nextExercise.Volume : null;
         dispatch({ type: 'NEXT_EXERCISE', payload: { duration } });
         if (duration !== null) {
-          timerWorkerRef.current.postMessage({ type: 'START_TIMER', payload: duration });
+          postToWorker({ type: 'START_TIMER', payload: duration });
         } else {
-          timerWorkerRef.current.postMessage({ type: 'PAUSE_TIMER' });
+          postToWorker({ type: 'PAUSE_TIMER' });
         }
       } else if (currentSet < currentExercise.set) {
         const firstExerciseInSet = currentGroup[0];
         const duration = firstExerciseInSet.Unita === "SEC" ? firstExerciseInSet.Volume : null;
         dispatch({ type: 'NEXT_SET', payload: { duration } });
         if (duration !== null) {
-          timerWorkerRef.current.postMessage({ type: 'START_TIMER', payload: duration });
+          postToWorker({ type: 'START_TIMER', payload: duration });
         } else {
-          timerWorkerRef.current.postMessage({ type: 'PAUSE_TIMER' });
+          postToWorker({ type: 'PAUSE_TIMER' });
         }
       } else if (currentGroupIndex < groupIds.length - 1) {
         dispatch({ type: 'TOGGLE_WAITING_GROUP' });
-        dispatch({ type: 'PAUSE' });
-        timerWorkerRef.current.postMessage({ type: 'PAUSE_TIMER' });
+        postToWorker({ type: 'PAUSE_TIMER' });
       } else {
         dispatch({ type: 'FINISH_WORKOUT' });
-        timerWorkerRef.current.postMessage({ type: 'STOP_TIMER' });
+        postToWorker({ type: 'STOP_TIMER' });
       }
     } else {
       const restDuration = currentExercise.Rest;
       dispatch({ type: 'START_REST', payload: { duration: restDuration } });
-      timerWorkerRef.current.postMessage({ type: 'START_TIMER', payload: restDuration });
+      postToWorker({ type: 'START_TIMER', payload: restDuration });
     }
   }, [currentGroupIndex, currentExerciseIndex, currentSet, isRest, currentGroup, currentExercise, groupIds, timerState]);
 
@@ -235,7 +249,7 @@ export default function Timer({ workoutData, onExit }) {
             wakeLockRef.current = await navigator.wakeLock.request("screen");
           }
         } else if (wakeLockRef.current) {
-          wakeLockRef.current.release();
+          await wakeLockRef.current.release();
           wakeLockRef.current = null;
         }
       } catch (err) {
@@ -243,15 +257,27 @@ export default function Timer({ workoutData, onExit }) {
       }
     };
     requestWakeLock();
-    return () => wakeLockRef.current?.release();
-  }, [timerState]);
+  return () => {
+    (async () => {
+      try {
+        if (wakeLockRef.current) {
+          await wakeLockRef.current.release();
+          wakeLockRef.current = null;
+        }
+      } catch (e) {
+        /* swallow */
+      }
+    })();
+  };
+}, [timerState]);
 
   const handleManualAdvance = () => {
     if (isRest) {
       handleAdvance();
     } else if (currentExercise.Unita === "REPS") {
+      const restDuration = currentExercise.Rest || 30
       dispatch({ type: 'START_REST' });
-      timerWorkerRef.current.postMessage({ type: 'START_TIMER', payload: currentExercise.Rest });
+      postToWorker({ type: 'START_TIMER', payload: restDuration });
     }
   };
 
@@ -265,7 +291,7 @@ export default function Timer({ workoutData, onExit }) {
 
   useEffect(() => {
   if (timerState === TIMER_STATES.PREPARING && timerWorkerRef.current) {
-    timerWorkerRef.current.postMessage({ type: 'START_TIMER', payload: 5 });
+    postToWorker({ type: 'START_TIMER', payload: 5 });
   }
 }, [timerState]);
 
@@ -273,16 +299,16 @@ export default function Timer({ workoutData, onExit }) {
     if (timerState === TIMER_STATES.PAUSED) {
         dispatch({ type: 'RESUME' });
         if (timeRemaining !== null) {
-            timerWorkerRef.current.postMessage({ type: 'RESUME_TIMER', payload: timeRemaining });
+            postToWorker({ type: 'RESUME_TIMER', payload: timeRemaining });
         }
     } else {
         dispatch({ type: 'PAUSE' });
-        timerWorkerRef.current.postMessage({ type: 'PAUSE_TIMER' });
+        postToWorker({ type: 'PAUSE_TIMER' });
     }
   };
 
   const handleStopWorkout = () => {
-    timerWorkerRef.current.postMessage({ type: 'STOP_TIMER' });
+    postToWorker({ type: 'STOP_TIMER' });
     onExit();
   };
 
@@ -291,18 +317,18 @@ export default function Timer({ workoutData, onExit }) {
       const newTimeRemaining = currentExercise.Unita === "SEC" ? currentExercise.Volume : null;
       dispatch({ type: 'START_EXERCISE', payload: { duration: newTimeRemaining, exerciseIndex: currentExerciseIndex } });
       if (newTimeRemaining !== null) {
-        timerWorkerRef.current.postMessage({ type: 'RESUME_TIMER', payload: newTimeRemaining });
+        postToWorker({ type: 'START_TIMER', payload: newTimeRemaining });
       } else {
-        timerWorkerRef.current.postMessage({ type: 'PAUSE_TIMER' });
+        postToWorker({ type: 'PAUSE_TIMER' });
       }
     } else if (currentExerciseIndex > 0) {
       const prev = currentGroup[currentExerciseIndex - 1];
       const newTimeRemaining = prev.Unita === 'SEC' ? prev.Volume : null;
       dispatch({ type: 'GOTO_PREV_EXERCISE', payload: { groupIndex: currentGroupIndex, set: currentSet, exerciseIndex: currentExerciseIndex - 1, duration: newTimeRemaining }});
       if (newTimeRemaining !== null) {
-        timerWorkerRef.current.postMessage({ type: 'RESUME_TIMER', payload: newTimeRemaining });
+        postToWorker({ type: 'RESUME_TIMER', payload: newTimeRemaining });
       } else {
-        timerWorkerRef.current.postMessage({ type: 'PAUSE_TIMER' });
+        postToWorker({ type: 'PAUSE_TIMER' });
       }
     }
 };
@@ -314,9 +340,9 @@ export default function Timer({ workoutData, onExit }) {
         const duration = nextGroup[0].Unita === "SEC" ? nextGroup[0].Volume : null;
         dispatch({ type: 'NEXT_GROUP', payload: { duration } });
         if (duration !== null) {
-            timerWorkerRef.current.postMessage({ type: 'START_TIMER', payload: duration });
+            postToWorker({ type: 'START_TIMER', payload: duration });
         } else {
-            timerWorkerRef.current.postMessage({ type: 'PAUSE_TIMER' });
+            postToWorker({ type: 'PAUSE_TIMER' });
         }
     }
   };
@@ -328,9 +354,9 @@ export default function Timer({ workoutData, onExit }) {
         const duration = prevGroup[0].Unita === "SEC" ? prevGroup[0].Volume : null;
         dispatch({ type: 'GOTO_PREV_EXERCISE', payload: { groupIndex: prevGroupIndex, set: 1, exerciseIndex: 0, duration: duration }});
         if (duration !== null) {
-            timerWorkerRef.current.postMessage({ type: 'RESUME_TIMER', payload: duration });
+            postToWorker({ type: 'RESUME_TIMER', payload: duration });
         } else {
-            timerWorkerRef.current.postMessage({ type: 'PAUSE_TIMER' });
+            postToWorker({ type: 'PAUSE_TIMER' });
         }
     }
   };
@@ -356,6 +382,10 @@ export default function Timer({ workoutData, onExit }) {
       </div>
     );
   }
+
+  
+
+
   
   return (
     <div className="fixed inset-0 bg-brand-dark text-offwhite z-50 flex flex-col items-center justify-center p-4">

@@ -13,6 +13,18 @@ export default function CreateWorkout({ selectedUser, onGenerated }) {
   const [currentGroup, setCurrentGroup] = useState("1");
   const [userList, setUserList] = useState([]);
   const { profile, loading } = UserProfile();
+  const TIPOLOGIE = [
+  "ESERCIZIO",
+  "LADDER",
+  "EDT",
+  "EMOM",
+  "TABATA",
+  "R4T",
+  "RT",
+  "INTERVAL TRAINING",
+  "AMRAP"
+];
+
   const [currentExercise, setCurrentExercise] = useState({
     Tipologia: "",
     Ambito: "",
@@ -29,6 +41,20 @@ export default function CreateWorkout({ selectedUser, onGenerated }) {
   const [availablePilastri, setAvailablePilastri] = useState([]);
   const [availableEsercizi, setAvailableEsercizi] = useState([]);
   const [workoutName, setWorkoutName] = useState("");
+  const [workoutId, setWorkoutId] = useState([]);
+  // Reset esercizio
+const resetExercise = () => ({
+  Tipologia: "",
+  Ambito: "",
+  Pilastro: "",
+  Esercizio: "",
+  set: 1,
+  Volume: 30,
+  Unita: "SEC",
+  Rest: 15,
+  Note: ""
+});
+
 
   // --- Carica gli utenti da Firestore
   useEffect(() => {
@@ -96,6 +122,8 @@ export default function CreateWorkout({ selectedUser, onGenerated }) {
     setCurrentExercise((prev) => ({ ...prev, [field]: value }));
   };
 
+  
+
   const handleAddExercise = () => {
     if (!currentExercise.Ambito || !currentExercise.Pilastro || !currentExercise.Esercizio) {
       alert("Seleziona Ambito, Pilastro ed Esercizio prima di aggiungere.");
@@ -103,22 +131,20 @@ export default function CreateWorkout({ selectedUser, onGenerated }) {
     }
 
     setGroups((prev) => {
-      const groupExercises = prev[currentGroup] ? [...prev[currentGroup]] : [];
-      groupExercises.push({ ...currentExercise });
-      return { ...prev, [currentGroup]: groupExercises };
+      const existing = prev[currentGroup] || { exercises: [], totalSets: 0 };
+      const newExercises = [...existing.exercises, { ...currentExercise }];
+      const newTotalSets = newExercises.reduce((sum, ex) => sum + (ex.set || 1), 0);
+
+      return {
+        ...prev,
+        [currentGroup]: {
+          exercises: newExercises,
+          totalSets: newTotalSets
+        }
+      };
     });
 
-    setCurrentExercise({
-      Tipologia: "",
-      Ambito: "",
-      Pilastro: "",
-      Esercizio: "",
-      set: 1,
-      Volume: 30,
-      Unita: "SEC",
-      Rest: 15, 
-      Note: ""
-    });
+    setCurrentExercise(resetExercise());
   };
 
   const handleAddGroup = () => {
@@ -140,36 +166,69 @@ export default function CreateWorkout({ selectedUser, onGenerated }) {
       const userWorkoutsRef = collection(db, "workouts", selectedUser.id, "userWorkouts");
 
       // aggiunge un nuovo documento con ID generato da Firestore
-      await addDoc(userWorkoutsRef, {
+      const docRef = await addDoc(userWorkoutsRef, {
         name: workoutName,
         createdAt: serverTimestamp(),
         groups
       });
+    
 
       alert(`Workout salvato per ${selectedUser.email}!`);
-      setGroups({});
-      setWorkoutName("");
+      setWorkoutId(docRef.id); // adesso sappiamo quale workout è stato salvato
 
-
+      //TODO: da capire se eliminare o meno
+     /*  setGroups({});
+      setWorkoutName(""); */
     } catch (err) {
       console.error("Errore salvataggio workout:", err);
       alert("Errore durante il salvataggio!");
     }
   };
 
+
+   // aggiorna un workout esistente
+  const handleUpdateWorkout = async () => {
+    if (!workoutId) return alert("Nessun workout caricato da modificare.");
+    try {
+      const workoutRef = doc(db, "workouts", selectedUser.id, "userWorkouts", workoutId);
+      await setDoc(workoutRef, { name: workoutName, groups }, { merge: true });
+      alert("Workout aggiornato con successo!");
+    } catch (err) {
+      console.error("Errore aggiornamento workout:", err);
+    }
+  };
+
+
+   // carica un workout da Firestore
+  const handleLoadWorkout = async (id) => {
+    try {
+      const workoutRef = doc(db, "workouts", selectedUser.id, "userWorkouts", id);
+      const snap = await getDoc(workoutRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        setWorkoutName(data.name);
+        setGroups(data.groups);
+        setWorkoutId(id);
+      }
+    } catch (err) {
+      console.error("Errore caricamento workout:", err);
+    }
+  };
   return (
     <div className="p-4 max-w-xl mx-auto rounded shadow">
-      <h2 className="text-xl font-bold mb-2">Crea Workout Avanzato per {selectedUser?.name}</h2>
-
+<h2 className="text-xl font-bold mb-2">
+        {workoutId ? "Modifica Workout" : "Crea Workout"} per {selectedUser?.name}
+      </h2>
       <div className="mb-2">
 
-        <input
-          type="text"
-          placeholder="Nome workout"
-          value={workoutName}
-          onChange={(e) => setWorkoutName(e.target.value)}
-          className="border p-2 rounded mb-2 w-full"
-        />
+         {/* Nome workout */}
+      <input
+        type="text"
+        placeholder="Nome workout"
+        value={workoutName}
+        onChange={(e) => setWorkoutName(e.target.value)}
+        className="border p-2 rounded mb-2 w-full"
+      />
 
 
         <span className="mr-2">Gruppo corrente: {currentGroup}</span>
@@ -182,13 +241,19 @@ export default function CreateWorkout({ selectedUser, onGenerated }) {
       </div>
 
       <div className="flex flex-col gap-2 mb-4">
-        <input
-          type="text"
-          placeholder="Tipologia"
+        {/* Dropdown Tipologia */}
+        <select
           value={currentExercise.Tipologia}
           onChange={(e) => handleExerciseChange("Tipologia", e.target.value)}
-          className="border p-2 rounded text-brand"
-        />
+          className="border p-2 rounded"
+        >
+          <option value="">-- Seleziona Tipologia --</option>
+          {TIPOLOGIE.map((tipo) => (
+            <option key={tipo} value={tipo}>
+              {tipo}
+            </option>
+          ))}
+        </select>
 
         <select
           value={currentExercise.Ambito}
@@ -296,17 +361,29 @@ export default function CreateWorkout({ selectedUser, onGenerated }) {
 
 
 
-      <button
-        onClick={handleSaveWorkout}
-        className="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600 transition mb-4"
-      >
-        Salva Workout su DB
-      </button>
+       {/* Pulsanti salvataggio */}
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={handleSaveWorkout}
+          className="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600"
+        >
+          Salva Workout
+        </button>
+        {workoutId && (
+          <button
+            onClick={handleUpdateWorkout}
+            className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600"
+          >
+            Aggiorna Workout
+          </button>
+        )}
+      </div>
+
 
       <h3 className="font-semibold mb-2">Preview Workout</h3>
       <div className="space-y-4 max-h-96 overflow-auto">
-        {Object.entries(groups).map(([groupId, exercises]) => (
-          <div key={groupId} className="bg-white shadow rounded p-4">
+        {Object.entries(groups).map(([groupId, group]) => (
+          <div key={groupId} className="bg-white text-brand-dark shadow rounded p-4">
             <h4 className="font-bold mb-2">Gruppo {groupId}</h4>
             <table className="w-full table-auto border-collapse">
               <thead>
@@ -322,7 +399,7 @@ export default function CreateWorkout({ selectedUser, onGenerated }) {
                 </tr>
               </thead>
               <tbody>
-                {exercises.map((ex, idx) => (
+                {group.exercises.map((ex, idx) => (
                   <tr key={idx} className="hover:bg-gray-50">
                     <td className="border px-2 py-1">{ex.Tipologia}</td>
                     <td className="border px-2 py-1">{ex.Ambito}</td>
