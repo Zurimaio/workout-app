@@ -1,47 +1,57 @@
-let intervalId = null;
+let interval = null;
 let remainingTime = 0;
 
 self.onmessage = (e) => {
     const { type, payload } = e.data;
 
-    const startInterval = () => {
-        clearInterval(intervalId);
-        intervalId = setInterval(() => {
-            remainingTime -= 1;
-            if (remainingTime <= 0) {
-                remainingTime = 0;
-                self.postMessage({ type: 'UPDATE_TIME', payload: remainingTime });
-                clearInterval(intervalId);
-                self.postMessage({ type: 'TIMER_END' });
-            } else {
-                self.postMessage({ type: 'UPDATE_TIME', payload: remainingTime });
-            }
-        }, 1000);
+    const clearExistingInterval = () => {
+        if (interval) {
+            clearInterval(interval);
+            interval = null;
+        }
     };
 
     switch (type) {
         case 'START_TIMER':
-            remainingTime = Math.ceil(payload);
-            self.postMessage({ type: 'UPDATE_TIME', payload: remainingTime });
-            startInterval();
+            clearExistingInterval();
+            remainingTime = payload;
+            postMessage({ type: 'UPDATE_TIME', payload: remainingTime });
+
+            interval = setInterval(() => {
+                remainingTime -= 1;
+                postMessage({ type: 'UPDATE_TIME', payload: remainingTime });
+
+                if (remainingTime <= 0) {
+                    clearExistingInterval();
+                    postMessage({ type: 'TIMER_END' });
+                }
+            }, 1000);
             break;
 
         case 'PAUSE_TIMER':
-            clearInterval(intervalId);
-            intervalId = null;
+            clearExistingInterval();
             break;
 
         case 'RESUME_TIMER':
-            remainingTime = Math.ceil(payload);
-            self.postMessage({ type: 'UPDATE_TIME', payload: remainingTime });
-            startInterval();
+            clearExistingInterval();
+            interval = setInterval(() => {
+                remainingTime -= 1;
+                postMessage({ type: 'UPDATE_TIME', payload: remainingTime });
+
+                if (remainingTime <= 0) {
+                    clearExistingInterval();
+                    postMessage({ type: 'TIMER_END' });
+                }
+            }, 1000);
             break;
 
         case 'STOP_TIMER':
-            clearInterval(intervalId);
-            intervalId = null;
+            clearExistingInterval();
             remainingTime = 0;
-            self.postMessage({ type: 'UPDATE_TIME', payload: remainingTime });
+            postMessage({ type: 'UPDATE_TIME', payload: remainingTime });
             break;
+
+        default:
+            console.warn('Unknown worker message type:', type);
     }
 };

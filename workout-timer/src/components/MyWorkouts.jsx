@@ -20,10 +20,7 @@ export default function MyWorkouts({ onPreview, onStart }) {
         const colRef = collection(db, "workouts", user.uid, "userWorkouts");
         const snapshot = await getDocs(colRef);
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        console.log("userWrokout:", data);
         setWorkouts(data);
-
-
       } catch (err) {
         console.error("Errore caricamento workout:", err);
         setWorkouts([]);
