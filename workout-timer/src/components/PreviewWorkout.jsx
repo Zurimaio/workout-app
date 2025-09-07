@@ -1,4 +1,6 @@
 import {React, useRef} from "react";
+import { Dumbbell, Repeat, Clock, PauseCircle, StickyNote } from "lucide-react";
+
 
 export default function PreviewWorkout({ workoutData, onStart, onReload }) {
     const containerRef = useRef(null);
@@ -40,12 +42,12 @@ export default function PreviewWorkout({ workoutData, onStart, onReload }) {
       ))}
 
       <div className="flex gap-4 justify-center mt-4">
-        <button
+    {/*     <button
           onClick={onStart}
           className="bg-green-500 text-white px-4 py-2 rounded shadow hover:bg-green-600 transition"
         >
           Avvia Workout (alfa-version)
-        </button>
+        </button> */}
 
         <button
           onClick={handleFullScreen}
