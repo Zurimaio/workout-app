@@ -5,6 +5,7 @@ import UserProfile from "../hooks/UserProfile";
 import MyWorkouts from "./MyWorkouts";
 import ProfileMenu from "./ProfileMenu";
 import Timer from "./Timer";
+import SimpleTimer from "./SimpleTimer";
 import PreviewWorkout from "./PreviewWorkout";
 import Header from "./Header";
 import Sidebar from "../components/Sidebar";
@@ -104,7 +105,10 @@ export default function Dashboard() {
             >
               ← Torna alla Home
             </button>
-            <Timer workoutData={workoutData} onExit={() => setView("myWorkouts") && setTimerActive(false)} />
+           {/*  <Timer workoutData={workoutData} onExit={() => setView("myWorkouts") && setTimerActive(false)} /> */}
+            <SimpleTimer workoutData={workoutData} onExit={() => setView("myWorkouts") } />
+
+
           </div>
         )}
 
