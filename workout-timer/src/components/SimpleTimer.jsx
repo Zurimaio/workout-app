@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Play,
   Pause,
@@ -9,9 +9,10 @@ import {
   Clock,
   CheckCircle,
   XCircle,
+  Volume2
 } from "lucide-react";
 
-export default function SimpleTimer({ workoutData, onFinish }) {
+export default function SimpleTimer({ workoutData, onFinish, enableAudio, audioCtx }) {
   const groupIds = Object.keys(workoutData);
   const [currentGroupIndex, setCurrentGroupIndex] = useState(0);
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
@@ -24,13 +25,14 @@ export default function SimpleTimer({ workoutData, onFinish }) {
   const currentGroup = workoutData[groupIds[currentGroupIndex]];
   const currentExercise = currentGroup[currentExerciseIndex];
 
+
   // countdown timer
   useEffect(() => {
     if (!isRunning) return;
 
     if (timeRemaining <= 0) {
       // beep più lungo
-      playBeep(220, 500);
+      playBeep(880, 500);
 
       if (!isRest && currentExercise.Unita === "SEC") {
         // finito esercizio -> vai a riposo
@@ -45,7 +47,7 @@ export default function SimpleTimer({ workoutData, onFinish }) {
 
      // beep solo negli ultimi 3 secondi
     if (timeRemaining <= 3) {
-      playBeep(880, 150);
+      playBeep(440, 150);
     }
 
     const timerId = setTimeout(() => {
@@ -128,6 +130,45 @@ export default function SimpleTimer({ workoutData, onFinish }) {
     setIsRunning(false);
   };
 
+  const goNextExercise = useCallback(() => {
+    if (currentExerciseIndex < currentGroup.length - 1) {
+      setCurrentExerciseIndex((i) => i + 1);
+      setIsRest(false);
+      setTimeRemaining(currentGroup[currentExerciseIndex + 1].Unita === "SEC"
+        ? currentGroup[currentExerciseIndex + 1].Volume
+        : null);
+    } else {
+      // finito gruppo
+      if (currentSet < currentExercise.set) {
+        setCurrentSet((s) => s + 1);
+        setCurrentExerciseIndex(0);
+        setIsRest(false);
+        setTimeRemaining(currentGroup[0].Unita === "SEC" ? currentGroup[0].Volume : null);
+      } else if (currentGroupIndex < groupIds.length - 1) {
+        setCurrentGroupIndex((g) => g + 1);
+        setCurrentSet(1);
+        setCurrentExerciseIndex(0);
+        setIsRest(false);
+        setTimeRemaining(workoutData[groupIds[currentGroupIndex + 1]][0].Unita === "SEC"
+          ? workoutData[groupIds[currentGroupIndex + 1]][0].Volume
+          : null);
+      } else {
+        onFinish(); // workout terminato
+      }
+    }
+  }, [currentExerciseIndex, currentGroup, currentSet, currentExercise, currentGroupIndex, groupIds, workoutData, onFinish]);
+
+
+  const goPrevExercise = () => {
+    if (currentExerciseIndex > 0) {
+      setCurrentExerciseIndex((i) => i - 1);
+      setIsRest(false);
+      setTimeRemaining(currentGroup[currentExerciseIndex - 1].Unita === "SEC"
+        ? currentGroup[currentExerciseIndex - 1].Volume
+        : null);
+    }
+  };
+
   const handleManualComplete = () => {
     // Per esercizi a REPS → vai subito al riposo
     startRest();
@@ -140,23 +181,23 @@ export default function SimpleTimer({ workoutData, onFinish }) {
   };
 
 
-  function playBeep(frequency = 440, duration = 200) {
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
-  const oscillator = ctx.createOscillator();
-  const gainNode = ctx.createGain();
 
-  oscillator.connect(gainNode);
-  gainNode.connect(ctx.destination);
+
+
+ function playBeep (frequency = 440, duration = 200) {
+  if (!audioCtx) return;
+  const oscillator = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
 
   oscillator.type = "sine";
-  oscillator.frequency.value = frequency; // Hz
+  oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+
+  oscillator.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+
   oscillator.start();
-
-  gainNode.gain.setValueAtTime(1, ctx.currentTime);
-  gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration / 1000);
-
-  oscillator.stop(ctx.currentTime + duration / 1000);
-}
+  oscillator.stop(audioCtx.currentTime + duration / 1000);
+};
 
   // Avvia automaticamente il primo esercizio al cambio
   useEffect(() => {

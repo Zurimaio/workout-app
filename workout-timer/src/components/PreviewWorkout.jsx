@@ -5,7 +5,17 @@ import SimpleTimer from "./SimpleTimer"; // importa il timer semplice
 export default function PreviewWorkout({ workoutData, onStart, onReload }) {
   const containerRef = useRef(null);
   const [activeGroup, setActiveGroup] = useState(null); // gruppo selezionato per timer
+  const [audioCtx, setAudioCtx] = useState(null);
 
+    const enableAudio = () => {
+  if (!audioCtx) {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    ctx.resume(); // sblocca il contesto
+    setAudioCtx(ctx);
+    console.log("AudioContext sbloccato");
+  }
+  };
+  
   const handleFullScreen = () => {
     if (containerRef.current) {
       if (document.fullscreenElement) {
@@ -22,6 +32,8 @@ export default function PreviewWorkout({ workoutData, onStart, onReload }) {
     setActiveGroup(null); // chiude il timer e torna alla preview
   };
 
+   
+
   return (
     <div ref={containerRef} className="p-6 max-w-4xl mx-auto relative">
       <h1 className="text-3xl font-bold mb-6 text-center text-white">
@@ -37,6 +49,8 @@ export default function PreviewWorkout({ workoutData, onStart, onReload }) {
           <SimpleTimer
             workoutData={{ [activeGroup.id]: activeGroup.exercises }}
             onFinish={handleFinishGroup}
+            enableAudio={enableAudio}
+            audioCtx={audioCtx}
           />
         </div>
       ) : (
