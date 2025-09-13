@@ -7,15 +7,27 @@ export default function PreviewWorkout({ workoutData, onStart, onReload }) {
   const [activeGroup, setActiveGroup] = useState(null); // gruppo selezionato per timer
   const [audioCtx, setAudioCtx] = useState(null);
 
-    const enableAudio = () => {
-  if (!audioCtx) {
+   
+    const handleEnableAudio = () => {
+   if (!audioCtx) {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    ctx.resume(); // sblocca il contesto
-    setAudioCtx(ctx);
-    console.log("AudioContext sbloccato");
+
+    // Hack: crea un suono silenzioso per sbloccare l'audio su Safari/iOS
+    const buffer = ctx.createBuffer(1, 1, 22050);
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    source.start(0);
+
+    ctx.resume().then(() => {
+      console.log("🔊 AudioContext attivo:", ctx.state);
+      setAudioCtx(ctx);
+    }).catch(err => {
+      console.error("Errore attivazione AudioContext:", err);
+    });
   }
   };
-  
+
   const handleFullScreen = () => {
     if (containerRef.current) {
       if (document.fullscreenElement) {
@@ -49,7 +61,6 @@ export default function PreviewWorkout({ workoutData, onStart, onReload }) {
           <SimpleTimer
             workoutData={{ [activeGroup.id]: activeGroup.exercises }}
             onFinish={handleFinishGroup}
-            enableAudio={enableAudio}
             audioCtx={audioCtx}
           />
         </div>
@@ -113,9 +124,10 @@ export default function PreviewWorkout({ workoutData, onStart, onReload }) {
                   {/* Bottone avvia timer per il gruppo */}
                   <div className="flex justify-center mt-4">
                     <button
-                      onClick={() =>
+                      onClick={() =>{
+                        handleEnableAudio(); // sblocca audio
                         setActiveGroup({ id: groupId, exercises })
-                      }
+                      }}
                       className="bg-green-600 text-white px-6 py-2 rounded-xl shadow hover:bg-green-700 flex items-center gap-2"
                     >
                       <Play className="w-5 h-5" /> Avvia Timer Gruppo

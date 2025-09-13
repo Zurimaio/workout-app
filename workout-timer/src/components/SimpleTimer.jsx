@@ -4,283 +4,337 @@ import {
   Pause,
   SkipForward,
   SkipBack,
-  RotateCcw,
   Dumbbell,
   Clock,
   CheckCircle,
   XCircle,
-  Volume2
 } from "lucide-react";
 
-export default function SimpleTimer({ workoutData, onFinish, enableAudio, audioCtx }) {
-  const groupIds = Object.keys(workoutData);
+export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime = 5 }) {
+  // PREP_TIME ora è parametrizzabile via prop (default 5s)
+  const PREP_TIME = prepTime;
+  const groupIds = Object.keys(workoutData || {});
+  if (!groupIds.length) return <div>Nessun workout.</div>;
+
   const [currentGroupIndex, setCurrentGroupIndex] = useState(0);
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [currentSet, setCurrentSet] = useState(1);
 
-  const [timeRemaining, setTimeRemaining] = useState(null);
-  const [isRunning, setIsRunning] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(PREP_TIME);
+  const [isRunning, setIsRunning] = useState(true); // parte automaticamente in prep
   const [isRest, setIsRest] = useState(false);
+  const [isPrep, setIsPrep] = useState(true);
 
   const currentGroup = workoutData[groupIds[currentGroupIndex]];
-  const currentExercise = currentGroup[currentExerciseIndex];
+  const currentExercise = currentGroup?.[currentExerciseIndex];
 
 
-  // countdown timer
+    useEffect(()=>{console.log(workoutData)})
+
+  // playBeep: aggiorna per fare resume() se audioCtx sospeso
+  const playBeep = async (frequency = 440, duration = 200) => {
+    if (!audioCtx) return;
+    console.log("▶️ Beep", frequency, "Hz - ctx state:", audioCtx?.state);
+
+    try {
+      if (audioCtx.state === "suspended") {
+        await audioCtx.resume();
+      }
+    } catch (e) {
+      // se resume fallisce non rompere il flusso
+      // console.warn("audioCtx.resume() fallita:", e);
+      return;
+    }
+
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+
+    gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
+    // piccolo fade out per evitare click
+    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration / 1000);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + duration / 1000);
+
+    oscillator.onended = () => {
+      try {
+        oscillator.disconnect();
+        gainNode.disconnect();
+      } catch (e) {}
+    };
+  };
+
+  // --- Quando cambia esercizio / set / gruppo, inizializza PREP ---
+  useEffect(() => {
+    // protezione se currentExercise non definito
+    if (!currentExercise) return;
+
+    if (currentExerciseIndex === 0 && currentSet === 1) {
+    setIsPrep(true);
+    setIsRest(false);
+    setIsRunning(true);
+    setTimeRemaining(PREP_TIME);
+  } else {
+    // no prep: entri direttamente in esercizio
+    setIsPrep(false);
+    setIsRest(false);
+    if (currentExercise.Unita === "SEC") {
+      setTimeRemaining(currentExercise.Volume);
+      setIsRunning(true);
+    } else {
+      setTimeRemaining(null);
+      setIsRunning(false);
+    }
+  }
+  }, [currentExerciseIndex, currentSet, currentGroupIndex]);
+
+  // Countdown principale (prep / exercise / rest)
   useEffect(() => {
     if (!isRunning) return;
+    if (timeRemaining === null) return;
 
+    // tempo finito
     if (timeRemaining <= 0) {
-      // beep più lungo
-      playBeep(880, 500);
+      if (isPrep) {
+        // fine preparazione -> avvia esercizio (o mostra REPS)
+        playBeep(880, 700); // beep più lungo (es. 700ms, freq 880Hz)
+        setIsPrep(false);
+        if (!currentExercise) return;
+        if (currentExercise.Unita === "SEC") {
+          setTimeRemaining(currentExercise.Volume);
+          setIsRunning(true);
+        } else {
+          // REPS: nessun timer per le ripetizioni, attendi interazione utente
+          setTimeRemaining(null);
+          setIsRunning(false);
+        }
+        return;
+      }
 
-      if (!isRest && currentExercise.Unita === "SEC") {
-        // finito esercizio -> vai a riposo
+      // fine esercizio / rest
+      // beep di fine
+      void playBeep(880, 500);
+
+      if (!isRest && currentExercise && currentExercise.Unita === "SEC") {
+        // fine esercizio a tempo -> vai a riposo
         setIsRest(true);
-        setTimeRemaining(currentExercise.Rest || 30);
-      } else if (isRest || currentExercise.Unita === "REPS") {
-        // finito riposo o completato REPS -> prossimo esercizio
+        setTimeRemaining(currentExercise.Rest ?? 30);
+        setIsRunning(true);
+      } else {
+        // fine riposo o REPS -> avanza al prossimo esercizio
         goNextExercise();
       }
       return;
     }
 
-     // beep solo negli ultimi 3 secondi
-    if (timeRemaining <= 3) {
-      playBeep(440, 150);
+    // beep negli ultimi 3 secondi (anche durante prep se lo vuoi)
+    if (timeRemaining <= 3 && timeRemaining > 0) {
+      void playBeep(880, 120);
     }
 
-    const timerId = setTimeout(() => {
-      setTimeRemaining((prev) => prev - 1);
+    const t = setTimeout(() => {
+      setTimeRemaining((prev) => (prev !== null ? prev - 1 : prev));
     }, 1000);
 
-    return () => clearTimeout(timerId);
-  }, [timeRemaining, isRunning, isRest, currentExercise]);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeRemaining, isRunning, isPrep, isRest, currentExercise]); // dipende da currentExercise per Volume/Rest
 
+  // Funzione che calcola e imposta il prossimo esercizio (dopo rest o REPS)
+  const goNextExercise = useCallback(() => {
+    // copia stati attuali
+    let g = currentGroupIndex;
+    let e = currentExerciseIndex + 1;
+    let s = currentSet;
 
-  // attiva MediaSession API al mount
-  useEffect(() => {
-    if ("mediaSession" in navigator) {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: "Elev8 Timer",
-        artist: "Scheda di Allenamento",
-        album: "Allenamento",
-        artwork: [{ src: "/icons/workout.png", sizes: "512x512", type: "image/png" }],
-      });
+    const group = workoutData[groupIds[g]];
+    const isEndOfGroup = e >= group.length;
+    const isEndOfSet = s >= (currentExercise?.set ?? 1);
 
-      navigator.mediaSession.setActionHandler("play", () => setIsRunning(true));
-      navigator.mediaSession.setActionHandler("pause", () => setIsRunning(false));
-      navigator.mediaSession.setActionHandler("stop", () => onFinish());
+    if (isEndOfGroup) {
+      if (!isEndOfSet) {
+        // nuova ripetizione per lo stesso gruppo
+        e = 0;
+        s = s + 1;
+      } else if (g < groupIds.length - 1) {
+        // prossimo gruppo
+        g = g + 1;
+        e = 0;
+        s = 1;
+      } else {
+        // fine workout
+        onFinish();
+        return;
+      }
     }
-  }, [onFinish]);
 
-  const startExercise = () => {
-    if (currentExercise.Unita === "SEC") {
-      setTimeRemaining(currentExercise.Volume);
+    const nextExercise = workoutData[groupIds[g]][e];
+
+    // inizializza PREP o REPS
+    if (nextExercise.Unita === "SEC") {
+      setIsPrep(true);
+      setTimeRemaining(PREP_TIME);
       setIsRunning(true);
       setIsRest(false);
     } else {
-      setTimeRemaining(null); // esercizi a ripetizioni → no timer
+      // REPS -> nessun countdown (attendi "Fatto")
+      setIsPrep(false);
+      setIsRest(false);
+      setTimeRemaining(null);
       setIsRunning(false);
-      setIsRest(false);
     }
-  };
 
-  const startRest = () => {
-    setTimeRemaining(currentExercise.Rest || 30);
-    setIsRunning(true);
-    setIsRest(true);
-  };
+    setCurrentGroupIndex(g);
+    setCurrentExerciseIndex(e);
+    setCurrentSet(s);
+  }, [currentGroupIndex, currentExerciseIndex, currentSet, groupIds, workoutData, currentExercise, onFinish, PREP_TIME]);
 
-  const goNext = () => {
-    if (isRest) {
-      // Passa al prossimo esercizio o set
-      if (currentExerciseIndex < currentGroup.length - 1) {
-        setCurrentExerciseIndex((i) => i + 1);
-      } else if (currentSet < currentExercise.set) {
-        setCurrentExerciseIndex(0);
-        setCurrentSet((s) => s + 1);
-      } else if (currentGroupIndex < groupIds.length - 1) {
-        setCurrentGroupIndex((g) => g + 1);
-        setCurrentExerciseIndex(0);
-        setCurrentSet(1);
-      } else {
-        onFinish();
-      }
-      setIsRest(false);
-    } else {
-      startRest();
+  // Funzioni manuali next/prev invocate dai pulsanti
+  const handleNext = () => {
+    if (!isRest && (isPrep || (currentExercise?.Unita !== "SEC" && !isPrep))) {
+      // se siamo in prep o su REPS senza rest, interpretalo come "avvia rest"
+      setIsRest(true);
+      setTimeRemaining(currentExercise?.Rest ?? 30);
+      setIsRunning(true);
+      return;
     }
+    // se siamo in rest -> avanziamo
+    goNextExercise();
   };
 
-  const goPrev = () => {
+  const handlePrev = () => {
+    // tornare indietro: semplice logica "back one item"
     if (currentExerciseIndex > 0) {
       setCurrentExerciseIndex((i) => i - 1);
+      setIsPrep(true);
+      setTimeRemaining(PREP_TIME);
+      setIsRunning(true);
     } else if (currentSet > 1) {
-      setCurrentExerciseIndex(currentGroup.length - 1);
+      const lastIndex = workoutData[groupIds[currentGroupIndex]].length - 1;
       setCurrentSet((s) => s - 1);
+      setCurrentExerciseIndex(lastIndex);
+      setIsPrep(true);
+      setTimeRemaining(PREP_TIME);
+      setIsRunning(true);
     } else if (currentGroupIndex > 0) {
-      const prevGroup = workoutData[groupIds[currentGroupIndex - 1]];
-      setCurrentGroupIndex((g) => g - 1);
+      const prevGroupIndex = currentGroupIndex - 1;
+      const prevGroup = workoutData[groupIds[prevGroupIndex]];
+      setCurrentGroupIndex(prevGroupIndex);
       setCurrentExerciseIndex(prevGroup.length - 1);
       setCurrentSet(1);
+      setIsPrep(true);
+      setTimeRemaining(PREP_TIME);
+      setIsRunning(true);
     }
     setIsRest(false);
-    setTimeRemaining(null);
-    setIsRunning(false);
   };
 
-  const goNextExercise = useCallback(() => {
-    if (currentExerciseIndex < currentGroup.length - 1) {
-      setCurrentExerciseIndex((i) => i + 1);
-      setIsRest(false);
-      setTimeRemaining(currentGroup[currentExerciseIndex + 1].Unita === "SEC"
-        ? currentGroup[currentExerciseIndex + 1].Volume
-        : null);
-    } else {
-      // finito gruppo
-      if (currentSet < currentExercise.set) {
-        setCurrentSet((s) => s + 1);
-        setCurrentExerciseIndex(0);
-        setIsRest(false);
-        setTimeRemaining(currentGroup[0].Unita === "SEC" ? currentGroup[0].Volume : null);
-      } else if (currentGroupIndex < groupIds.length - 1) {
-        setCurrentGroupIndex((g) => g + 1);
-        setCurrentSet(1);
-        setCurrentExerciseIndex(0);
-        setIsRest(false);
-        setTimeRemaining(workoutData[groupIds[currentGroupIndex + 1]][0].Unita === "SEC"
-          ? workoutData[groupIds[currentGroupIndex + 1]][0].Volume
-          : null);
-      } else {
-        onFinish(); // workout terminato
-      }
-    }
-  }, [currentExerciseIndex, currentGroup, currentSet, currentExercise, currentGroupIndex, groupIds, workoutData, onFinish]);
-
-
-  const goPrevExercise = () => {
-    if (currentExerciseIndex > 0) {
-      setCurrentExerciseIndex((i) => i - 1);
-      setIsRest(false);
-      setTimeRemaining(currentGroup[currentExerciseIndex - 1].Unita === "SEC"
-        ? currentGroup[currentExerciseIndex - 1].Volume
-        : null);
-    }
+  // bottone "Fatto" per REPS
+  const handleRepsDone = () => {
+    setIsRest(true);
+    setTimeRemaining(currentExercise?.Rest ?? 30);
+    setIsRunning(true);
   };
 
-  const handleManualComplete = () => {
-    // Per esercizi a REPS → vai subito al riposo
-    startRest();
-  };
-
+  // stop workout
   const handleStop = () => {
-    if (window.confirm("Vuoi terminare il workout?")) {
-      onFinish();
-    }
+    if (window.confirm("Vuoi terminare il workout?")) onFinish();
   };
 
+  // ---------- RENDER ----------
+  // Se siamo in PREP mostriamo solo il counter PREP (minimal)
+  if (isPrep) {
+    return (
+      <div className="text-center text-white">
+        <h2 className="text-xl font-bold mb-4">Preparati</h2>
+        <div className="bg-gray-800 p-8 rounded-2xl shadow-lg mb-4">
+          <div className="text-6xl font-extrabold">
+            {timeRemaining !== null ? `${timeRemaining}s` : "--"}
+          </div>
+        </div>
+
+        <div className="flex justify-center gap-3">
+          {/** Play/Pause utili anche nella prep */}
+          {isRunning ? (
+            <button onClick={() => setIsRunning(false)} className="w-12 h-12 bg-yellow-600 rounded-full flex items-center justify-center">
+              <Pause className="w-6 h-6" />
+            </button>
+          ) : (
+            <button onClick={() => setIsRunning(true)} className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center">
+              <Play className="w-6 h-6" />
+            </button>
+          )}
+        </div>
+
+        <div className="mt-6">
+          <button onClick={handleStop} className="bg-red-600 px-6 py-2 rounded-lg text-white">Annulla</button>
+        </div>
+      </div>
+    );
+  }
 
 
-
-
- function playBeep (frequency = 440, duration = 200) {
-  if (!audioCtx) return;
-  const oscillator = audioCtx.createOscillator();
-  const gainNode = audioCtx.createGain();
-
-  oscillator.type = "sine";
-  oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
-
-  oscillator.connect(gainNode);
-  gainNode.connect(audioCtx.destination);
-
-  oscillator.start();
-  oscillator.stop(audioCtx.currentTime + duration / 1000);
-};
-
-  // Avvia automaticamente il primo esercizio al cambio
-  useEffect(() => {
-    startExercise();
-  }, [currentExerciseIndex, currentSet, currentGroupIndex]);
-
+  // Altrimenti mostriamo la UI dell'esercizio / rest
   return (
     <div className="text-center text-white">
       <h2 className="text-xl font-bold mb-2">
-        Gruppo {groupIds[currentGroupIndex]} – Set {currentSet}
+        Gruppo {groupIds[currentGroupIndex]} – Set {currentSet} 
       </h2>
 
       <div className="bg-gray-800 p-6 rounded-2xl shadow-lg mb-4">
-        <h3 className="text-lg font-semibold flex items-center justify-center gap-2 mb-4">
+        <h3 className="text-lg font-semibold mb-4">
           {isRest ? (
             <>
-              <Clock className="w-5 h-5 text-yellow-400" /> Riposo
+              <Clock className="inline-block w-5 h-5 text-yellow-400 mr-2" /> Riposo
             </>
           ) : (
             <>
-              <Dumbbell className="w-5 h-5 text-green-400" />{" "}
-              {currentExercise.Esercizio}
+              <Dumbbell className="inline-block w-5 h-5 text-green-400 mr-2" /> {currentExercise?.Esercizio}
             </>
           )}
         </h3>
 
         <div className="text-4xl font-bold mb-2">
-          {currentExercise.Unita === "SEC" || isRest ? (
+          {currentExercise?.Unita === "SEC" || isRest ? (
             <span>{timeRemaining !== null ? `${timeRemaining}s` : "--"}</span>
           ) : (
-            <span>{currentExercise.Volume} reps</span>
+            <span>{currentExercise?.Volume} reps</span>
           )}
         </div>
 
-        {!isRest && currentExercise.Unita === "REPS" && (
-          <button
-            onClick={handleManualComplete}
-            className="mt-3 bg-green-600 text-white px-5 py-2 rounded-lg shadow hover:bg-green-700 flex items-center gap-2 mx-auto"
-          >
-            <CheckCircle className="w-5 h-5" /> Fatto
-          </button>
+        {!isRest && currentExercise?.Unita === "REPS" && (
+          <button onClick={handleRepsDone} className="mt-3 bg-green-600 text-white px-5 py-2 rounded-lg">Fatto</button>
         )}
       </div>
 
       <div className="flex justify-center gap-3">
-        <button
-          onClick={goPrev}
-          className="w-12 h-12 flex items-center justify-center bg-gray-600 rounded-full hover:bg-gray-500"
-        >
+        <button onClick={handlePrev} className="w-12 h-12 bg-gray-600 rounded-full flex items-center justify-center">
           <SkipBack className="w-6 h-6" />
         </button>
 
         {isRunning ? (
-          <button
-            onClick={() => setIsRunning(false)}
-            className="w-12 h-12 flex items-center justify-center bg-yellow-600 rounded-full hover:bg-yellow-500"
-          >
+          <button onClick={() => setIsRunning(false)} className="w-12 h-12 bg-yellow-600 rounded-full flex items-center justify-center">
             <Pause className="w-6 h-6" />
           </button>
         ) : (
-          <button
-            onClick={() => setIsRunning(true)}
-            className="w-12 h-12 flex items-center justify-center bg-green-600 rounded-full hover:bg-green-500"
-          >
+          <button onClick={() => setIsRunning(true)} className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center">
             <Play className="w-6 h-6" />
           </button>
         )}
 
-        <button
-          onClick={goNext}
-          className="w-12 h-12 flex items-center justify-center bg-blue-600 rounded-full hover:bg-blue-500"
-        >
+        <button onClick={handleNext} className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center">
           <SkipForward className="w-6 h-6" />
         </button>
       </div>
 
       <div className="mt-6">
-        <button
-          onClick={handleStop}
-          className="bg-red-600 px-6 py-2 rounded-lg shadow hover:bg-red-700 flex items-center gap-2 mx-auto"
-        >
-          <XCircle className="w-5 h-5" /> Termina Workout
-        </button>
+        <button onClick={handleStop} className="bg-red-600 px-6 py-2 rounded-lg text-white">Termina Workout</button>
       </div>
     </div>
   );
