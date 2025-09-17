@@ -8,6 +8,8 @@ import PreviewWorkout from "../PreviewWorkout";
 import Header from "../Header";
 import UserProfile from "../../hooks/UserProfile";
 import Sidebar from "../Sidebar";
+import WorkoutEditor from "./WorkoutEditor"
+
 
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -26,6 +28,9 @@ export default function AdminPanel() {
   const {profile, loadingProfile} = UserProfile(); 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
+  
+
+
 
   // --- Carica gli utenti da Firestore
   useEffect(() => {
@@ -85,6 +90,72 @@ export default function AdminPanel() {
     fetchUserWorkouts(u.id);
   };
 
+  const handleUpdateWorkout = async (updatedData) => {
+  if (!selectedUser || !workoutData) return;
+
+  try {
+    const workoutRef = doc(
+      db,
+      "workouts",
+      selectedUser.id,
+      "userWorkouts",
+      workoutData.id
+    );
+
+    await setDoc(
+      workoutRef,
+      {
+        ...updatedData,
+        name: workoutData.name, // preservo il nome originale
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+
+    console.info("Workout aggiornato:", workoutData.id);
+    alert("✅ Workout aggiornato con successo!");
+
+    await fetchUserWorkouts(selectedUser.id);
+    setView("userWorkouts");
+  } catch (err) {
+    console.error("Errore aggiornamento workout:", err);
+    alert("❌ Errore durante l'aggiornamento!");
+  }
+};
+
+
+// Funzione separata per salvare/aggiornare un workout
+const handleSaveWorkout = async (updatedData) => {
+  if (!selectedUser) return;
+
+  try {
+    const workoutId = workoutData?.id || Date.now().toString(); // nuovo ID se creazione
+    const workoutRef = doc(
+      db,
+      "workouts",
+      selectedUser.id,
+      "userWorkouts",
+      workoutId
+    );
+
+    await setDoc(
+      workoutRef,
+      {
+        ...updatedData,
+        updatedAt: new Date().toISOString(), // timestamp utile
+      },
+      { merge: true }
+    );
+
+    alert("✅ Workout salvato con successo!");
+    await fetchUserWorkouts(selectedUser.id); // aggiorna lista
+    setView("userWorkouts"); // torna alla lista
+  } catch (err) {
+    console.error("Errore salvataggio workout:", err);
+    alert("❌ Errore durante il salvataggio!");
+  }
+};
+
   const handleDeleteWorkout = async (workoutId) => {
     if (!selectedUser) return;
     if (!window.confirm("Sei sicuro di voler cancellare questo workout?")) return;
@@ -98,6 +169,24 @@ export default function AdminPanel() {
     }
   };
 
+  const handleChangeWorkout = async (workoutId) => {
+  if (!selectedUser) return;
+  try {
+    const workoutRef = doc(db, "workouts", selectedUser.id, "userWorkouts", workoutId);
+    const workoutSnap = await getDoc(workoutRef);
+
+    if (workoutSnap.exists()) {
+      const workoutData = workoutSnap.data();
+      setWorkoutData({ ...workoutData, id: workoutId }); // includo anche id per aggiornare dopo
+      setView("edit"); // nuova vista di editing
+    } else {
+      alert("Workout non trovato!");
+    }
+  } catch (err) {
+    console.error("Errore caricamento workout:", err);
+    alert("Errore durante il caricamento!");
+  }
+};
 
 
   const handleJSONUpload = async (e) => {
@@ -210,8 +299,9 @@ export default function AdminPanel() {
             <p>Email: {user?.email}</p>
           </div>
         )}
-
-        {view === "create" && selectedUser && (
+        
+        {/*--- Sezione JSX per creazione o modifica workout*/}        
+        {(view === "create" || view === "edit") && selectedUser && (
           <div>
             <button
               onClick={() => setView("userWorkouts")}
@@ -219,12 +309,11 @@ export default function AdminPanel() {
             >
               ← Torna alla lista dei workout
             </button>
-            <CreateWorkout
+
+            <WorkoutEditor
               selectedUser={selectedUser}
-              onGenerated={(data) => {
-                setWorkoutData(data);
-                handleSelectUser(selectedUser); // aggiorna lista
-              }}
+              initialData={view === "edit" ? workoutData : null} // dati esistenti se modifica
+              onSave={handleSaveWorkout} // passiamo la funzione separata
             />
           </div>
         )}
@@ -238,7 +327,6 @@ export default function AdminPanel() {
           />
         )}
 
-
         {view === "userWorkouts" && selectedUser && (
           <div>
             <button
@@ -248,7 +336,6 @@ export default function AdminPanel() {
               ← Torna alla lista degli utenti
             </button>
             <div className="p-4 rounded">
-
 
               <h2 className="text-2xl font-bold mb-4">Workout di {selectedUser.name}</h2>
 
@@ -272,9 +359,16 @@ export default function AdminPanel() {
                             setWorkoutData(w.groups);
                             setView("preview"); // puoi riusare la PreviewWorkout
                           }}
-                          className="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600"
+                          className="bg-green-500 text-white px-2 py-1 rounded hover:bg-yellow-600"
                         >
                           Preview
+                        </button>
+                        <button onClick={() => 
+                            handleChangeWorkout(w.id)}
+                            className="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-red-600"
+
+                          >
+                          Modifica
                         </button>
                         <button
                           onClick={() => handleDeleteWorkout(w.id)}
@@ -282,6 +376,7 @@ export default function AdminPanel() {
                         >
                           Cancella
                         </button>
+                        
                       </div>
                     </li>
                   ))}
@@ -291,7 +386,6 @@ export default function AdminPanel() {
 
           </div>
         )}
-
 
         {view === "preview" && workoutData && (
           <div>
@@ -304,10 +398,12 @@ export default function AdminPanel() {
             <PreviewWorkout
               workoutData={workoutData}
               onStart={() => setView("timer")}
-
             />
           </div>
         )}
+
+      
+
       </main>
     </div>
   );

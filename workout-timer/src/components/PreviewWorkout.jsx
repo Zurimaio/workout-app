@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { Dumbbell, Repeat, Clock, PauseCircle, StickyNote, Play } from "lucide-react";
+import { Dumbbell, Repeat, Clock, PauseCircle, StickyNote, Play, RefreshCcw } from "lucide-react";
 import SimpleTimer from "./SimpleTimer"; // importa il timer semplice
 
 export default function PreviewWorkout({ workoutData, onStart, onReload }) {
@@ -55,8 +55,9 @@ export default function PreviewWorkout({ workoutData, onStart, onReload }) {
       {/* Se è attivo un gruppo, mostra SOLO il timer */}
       {activeGroup ? (
         <div className="bg-gray-900 p-6 rounded-xl shadow-lg">
-          <h2 className="text-xl font-semibold text-white mb-4 text-center">
-            Timer Gruppo {activeGroup.id}
+          <h2 className="text-xl font-semibold text-white mb-4 text-center flex items-center gap-2 justify-center">
+            <Repeat className="w-6 h-6 text-green-400 animate-spin" />
+            {activeGroup.name}
           </h2>
           <SimpleTimer
             workoutData={{ [activeGroup.id]: activeGroup.exercises }}
@@ -126,7 +127,7 @@ export default function PreviewWorkout({ workoutData, onStart, onReload }) {
                     <button
                       onClick={() =>{
                         handleEnableAudio(); // sblocca audio
-                        setActiveGroup({ id: groupId, exercises })
+                        setActiveGroup({ id: groupId, exercises, name: exercises.map(ex => ex.Esercizio).join(" • "),  })
                       }}
                       className="bg-green-600 text-white px-6 py-2 rounded-xl shadow hover:bg-green-700 flex items-center gap-2"
                     >

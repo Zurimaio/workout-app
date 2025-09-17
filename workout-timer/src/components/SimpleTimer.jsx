@@ -27,10 +27,11 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
 
   const currentGroup = workoutData[groupIds[currentGroupIndex]];
   const currentExercise = currentGroup?.[currentExerciseIndex];
+  const currentTotalSet = currentExercise.set;
 
 
-    useEffect(()=>{console.log(workoutData)})
-
+/*     useEffect(()=>{console.log(currentExercise)})
+ */
   // playBeep: aggiorna per fare resume() se audioCtx sospeso
   const playBeep = async (frequency = 440, duration = 200) => {
     if (!audioCtx) return;
@@ -284,7 +285,7 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
   return (
     <div className="text-center text-white">
       <h2 className="text-xl font-bold mb-2">
-        Gruppo {groupIds[currentGroupIndex]} – Set {currentSet} 
+        Set {currentSet} / {currentTotalSet}
       </h2>
 
       <div className="bg-gray-800 p-6 rounded-2xl shadow-lg mb-4">
