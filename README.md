@@ -58,6 +58,12 @@ Workout App è una piattaforma web per creare, gestire e seguire schede di allen
    - Verifica ruoli direttamente in Firebase Rules
    - Protezione dei dati utenti sensibili
 
+7. **Gestione Utenti**
+   - Gestione utenti avanzata (CLI)
+   - Lo script `manageUserCLI.js` consente all’admin di gestire gli utenti direttamente da terminale.
+      - node functions/manageUserCLI.js
+
+
 💡 **Nota:** L’app utilizza i ruoli utente per gestire i permessi. Solo gli Admin possono modificare e caricare nuovi workout.
 
 
@@ -65,7 +71,7 @@ Workout App è una piattaforma web per creare, gestire e seguire schede di allen
 
 ```bash
 git clone https://github.com/Zurimaio/workout-app.git
-cd workout-app
+cd workout-timer
 npm install
 npm run dev
 

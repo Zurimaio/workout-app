@@ -8,148 +8,132 @@ import {
   Clock,
   CheckCircle,
   XCircle,
+  Maximize,
+  Minimize,
 } from "lucide-react";
 
+import { useWakeLock } from "../utils/useWaveLock";
+
 export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime = 5 }) {
-  // PREP_TIME ora è parametrizzabile via prop (default 5s)
   const PREP_TIME = prepTime;
+
   const groupIds = Object.keys(workoutData || {});
-  if (!groupIds.length) return <div>Nessun workout.</div>;
+  const currentGroup = workoutData[groupIds[0]];
 
   const [currentGroupIndex, setCurrentGroupIndex] = useState(0);
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [currentSet, setCurrentSet] = useState(1);
 
-  const [timeRemaining, setTimeRemaining] = useState(PREP_TIME);
-  const [isRunning, setIsRunning] = useState(true); // parte automaticamente in prep
+  const [timeRemaining, setTimeRemaining] = useState(null);
+  const [isRunning, setIsRunning] = useState(false);
   const [isRest, setIsRest] = useState(false);
-  const [isPrep, setIsPrep] = useState(true);
+  const [isPrep, setIsPrep] = useState(false);
 
-  const currentGroup = workoutData[groupIds[currentGroupIndex]];
-  const currentExercise = currentGroup?.[currentExerciseIndex];
-  const currentTotalSet = currentExercise.set;
+  const currentGroupData = workoutData[groupIds[currentGroupIndex]];
+  const currentExercise = currentGroupData?.[currentExerciseIndex];
+  const currentTotalSet = currentExercise?.set || 1;
 
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [hasAgreedToStart, setHasAgreedToStart] = useState(false);
 
-/*     useEffect(()=>{console.log(currentExercise)})
- */
-  // playBeep: aggiorna per fare resume() se audioCtx sospeso
+  useWakeLock(isRunning);
+
+  const isIOS = () =>
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+  // Funzione beep
   const playBeep = async (frequency = 440, duration = 200) => {
     if (!audioCtx) return;
-    console.log("▶️ Beep", frequency, "Hz - ctx state:", audioCtx?.state);
-
-    try {
-      if (audioCtx.state === "suspended") {
-        await audioCtx.resume();
-      }
-    } catch (e) {
-      // se resume fallisce non rompere il flusso
-      // console.warn("audioCtx.resume() fallita:", e);
-      return;
-    }
-
-    const oscillator = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
-
-    gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
-    // piccolo fade out per evitare click
-    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration / 1000);
-
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-
-    oscillator.start();
-    oscillator.stop(audioCtx.currentTime + duration / 1000);
-
-    oscillator.onended = () => {
-      try {
-        oscillator.disconnect();
-        gainNode.disconnect();
-      } catch (e) {}
-    };
+    try { if (audioCtx.state === "suspended") await audioCtx.resume(); } catch (e) { }
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+    gain.gain.setValueAtTime(1, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration / 1000);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration / 1000);
+    osc.onended = () => { try { osc.disconnect(); gain.disconnect(); } catch (e) { } };
   };
 
-  // --- Quando cambia esercizio / set / gruppo, inizializza PREP ---
+  // Countdown
   useEffect(() => {
-    // protezione se currentExercise non definito
-    if (!currentExercise) return;
+    if (!isRunning || timeRemaining === null) return;
 
-    if (currentExerciseIndex === 0 && currentSet === 1) {
+    const tick = () => setTimeRemaining(prev => (prev !== null ? prev - 1 : prev));
+
+    if (timeRemaining > 0) {
+      // beep negli ultimi 3 secondi
+      if (timeRemaining <= 3) playBeep(880, 120);
+      const t = setTimeout(tick, 1000);
+      return () => clearTimeout(t);
+    }
+
+    // tempo finito
+    const finishCurrentPhase = () => {
+      if (isPrep) {
+        startExercise();
+      } else if (!isRest && currentExercise?.Unita === "SEC") {
+        startRest();
+      } else {
+        goNextExercise();
+      }
+    };
+
+    finishCurrentPhase();
+
+  }, [timeRemaining, isRunning, isPrep, isRest, currentExercise]);
+
+
+
+  // Funzioni helper
+  const startPrep = () => {
     setIsPrep(true);
     setIsRest(false);
-    setIsRunning(true);
     setTimeRemaining(PREP_TIME);
-  } else {
-    // no prep: entri direttamente in esercizio
+    setIsRunning(true);
+  };
+
+  const startExercise = () => {
     setIsPrep(false);
     setIsRest(false);
+
+    if (!currentExercise) return;
+
     if (currentExercise.Unita === "SEC") {
       setTimeRemaining(currentExercise.Volume);
       setIsRunning(true);
     } else {
+      // REPS
       setTimeRemaining(null);
       setIsRunning(false);
     }
-  }
-  }, [currentExerciseIndex, currentSet, currentGroupIndex]);
 
-  // Countdown principale (prep / exercise / rest)
-  useEffect(() => {
-    if (!isRunning) return;
-    if (timeRemaining === null) return;
+    playBeep(880, 700);
+  };
 
-    // tempo finito
-    if (timeRemaining <= 0) {
-      if (isPrep) {
-        // fine preparazione -> avvia esercizio (o mostra REPS)
-        playBeep(880, 700); // beep più lungo (es. 700ms, freq 880Hz)
-        setIsPrep(false);
-        if (!currentExercise) return;
-        if (currentExercise.Unita === "SEC") {
-          setTimeRemaining(currentExercise.Volume);
-          setIsRunning(true);
-        } else {
-          // REPS: nessun timer per le ripetizioni, attendi interazione utente
-          setTimeRemaining(null);
-          setIsRunning(false);
-        }
-        return;
-      }
+  const startRest = () => {
+    setIsPrep(false);
+    setIsRest(true);
+    setTimeRemaining(currentExercise?.Rest ?? 30);
+    setIsRunning(true);
+    playBeep(880, 500);
+  };
 
-      // fine esercizio / rest
-      // beep di fine
-      void playBeep(880, 500);
+  // NEXT / PREV Exercise
+  const goNextExercise = useCallback(() => {
+    if (!currentExercise) return;
 
-      if (!isRest && currentExercise && currentExercise.Unita === "SEC") {
-        // fine esercizio a tempo -> vai a riposo
-        setIsRest(true);
-        setTimeRemaining(currentExercise.Rest ?? 30);
-        setIsRunning(true);
-      } else {
-        // fine riposo o REPS -> avanza al prossimo esercizio
-        goNextExercise();
-      }
+    if (!isRest && currentExercise.Unita === "SEC") {
+      setIsRest(true);
+      setTimeRemaining(currentExercise.Rest ?? 30);
+      setIsRunning(true);
       return;
     }
 
-    // beep negli ultimi 3 secondi (anche durante prep se lo vuoi)
-    if (timeRemaining <= 3 && timeRemaining > 0) {
-      void playBeep(880, 120);
-    }
-
-    const t = setTimeout(() => {
-      setTimeRemaining((prev) => (prev !== null ? prev - 1 : prev));
-    }, 1000);
-
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeRemaining, isRunning, isPrep, isRest, currentExercise]); // dipende da currentExercise per Volume/Rest
-
-  // Funzione che calcola e imposta il prossimo esercizio (dopo rest o REPS)
-  const goNextExercise = useCallback(() => {
-    // copia stati attuali
     let g = currentGroupIndex;
     let e = currentExerciseIndex + 1;
     let s = currentSet;
@@ -159,184 +143,187 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
     const isEndOfSet = s >= (currentExercise?.set ?? 1);
 
     if (isEndOfGroup) {
-      if (!isEndOfSet) {
-        // nuova ripetizione per lo stesso gruppo
-        e = 0;
-        s = s + 1;
-      } else if (g < groupIds.length - 1) {
-        // prossimo gruppo
-        g = g + 1;
-        e = 0;
-        s = 1;
-      } else {
-        // fine workout
-        onFinish();
-        return;
-      }
+      if (!isEndOfSet) { e = 0; s++; }
+      else if (g < groupIds.length - 1) { g++; e = 0; s = 1; }
+      else { onFinish(); return; }
     }
 
     const nextExercise = workoutData[groupIds[g]][e];
-
-    // inizializza PREP o REPS
-    if (nextExercise.Unita === "SEC") {
-      setIsPrep(true);
-      setTimeRemaining(PREP_TIME);
-      setIsRunning(true);
-      setIsRest(false);
+    if (nextExercise.Unita === "SEC" && e === 0 && s === 1) {
+      setIsPrep(true); setTimeRemaining(PREP_TIME); setIsRunning(true); setIsRest(false);
     } else {
-      // REPS -> nessun countdown (attendi "Fatto")
-      setIsPrep(false);
-      setIsRest(false);
-      setTimeRemaining(null);
-      setIsRunning(false);
+      setIsPrep(false); setIsRest(false);
+      setTimeRemaining(nextExercise.Unita === "SEC" ? nextExercise.Volume : null);
+      setIsRunning(nextExercise.Unita === "SEC");
     }
 
-    setCurrentGroupIndex(g);
-    setCurrentExerciseIndex(e);
-    setCurrentSet(s);
-  }, [currentGroupIndex, currentExerciseIndex, currentSet, groupIds, workoutData, currentExercise, onFinish, PREP_TIME]);
+    setCurrentGroupIndex(g); setCurrentExerciseIndex(e); setCurrentSet(s);
 
-  // Funzioni manuali next/prev invocate dai pulsanti
-  const handleNext = () => {
-    if (!isRest && (isPrep || (currentExercise?.Unita !== "SEC" && !isPrep))) {
-      // se siamo in prep o su REPS senza rest, interpretalo come "avvia rest"
-      setIsRest(true);
-      setTimeRemaining(currentExercise?.Rest ?? 30);
-      setIsRunning(true);
-      return;
+  }, [currentExercise, currentGroupIndex, currentExerciseIndex, currentSet, workoutData, groupIds, PREP_TIME, isRest, onFinish]);
+
+  const goPrevExercise = useCallback(() => {
+    if (!currentExercise) return;
+
+    if (isRest) { setIsRest(false); setTimeRemaining(currentExercise.Volume); setIsRunning(true); return; }
+
+    let g = currentGroupIndex;
+    let e = currentExerciseIndex - 1;
+    let s = currentSet;
+
+    if (e < 0) {
+      if (s > 1) { s--; e = workoutData[groupIds[g]].length - 1; }
+      else if (g > 0) { g--; e = workoutData[groupIds[g]].length - 1; s = 1; }
+      else return;
     }
-    // se siamo in rest -> avanziamo
-    goNextExercise();
-  };
 
-  const handlePrev = () => {
-    // tornare indietro: semplice logica "back one item"
-    if (currentExerciseIndex > 0) {
-      setCurrentExerciseIndex((i) => i - 1);
-      setIsPrep(true);
-      setTimeRemaining(PREP_TIME);
-      setIsRunning(true);
-    } else if (currentSet > 1) {
-      const lastIndex = workoutData[groupIds[currentGroupIndex]].length - 1;
-      setCurrentSet((s) => s - 1);
-      setCurrentExerciseIndex(lastIndex);
-      setIsPrep(true);
-      setTimeRemaining(PREP_TIME);
-      setIsRunning(true);
-    } else if (currentGroupIndex > 0) {
-      const prevGroupIndex = currentGroupIndex - 1;
-      const prevGroup = workoutData[groupIds[prevGroupIndex]];
-      setCurrentGroupIndex(prevGroupIndex);
-      setCurrentExerciseIndex(prevGroup.length - 1);
-      setCurrentSet(1);
-      setIsPrep(true);
-      setTimeRemaining(PREP_TIME);
-      setIsRunning(true);
-    }
-    setIsRest(false);
-  };
+    const prevExercise = workoutData[groupIds[g]][e];
+    if (prevExercise.Unita === "SEC") { setIsRest(true); setTimeRemaining(prevExercise.Rest ?? 30); setIsRunning(true); setIsPrep(false); }
+    else { setIsPrep(true); setTimeRemaining(PREP_TIME); setIsRest(false); setIsRunning(true); }
 
-  // bottone "Fatto" per REPS
-  const handleRepsDone = () => {
-    setIsRest(true);
-    setTimeRemaining(currentExercise?.Rest ?? 30);
-    setIsRunning(true);
-  };
+    setCurrentGroupIndex(g); setCurrentExerciseIndex(e); setCurrentSet(s);
 
-  // stop workout
-  const handleStop = () => {
-    if (window.confirm("Vuoi terminare il workout?")) onFinish();
-  };
+  }, [currentExercise, currentGroupIndex, currentExerciseIndex, currentSet, workoutData, groupIds, PREP_TIME, isRest]);
 
-  // ---------- RENDER ----------
-  // Se siamo in PREP mostriamo solo il counter PREP (minimal)
-  if (isPrep) {
-    return (
-      <div className="text-center text-white">
-        <h2 className="text-xl font-bold mb-4">Preparati</h2>
-        <div className="bg-gray-800 p-8 rounded-2xl shadow-lg mb-4">
-          <div className="text-6xl font-extrabold">
-            {timeRemaining !== null ? `${timeRemaining}s` : "--"}
+  const handleRepsDone = () => { setIsRest(true); setTimeRemaining(currentExercise?.Rest ?? 30); setIsRunning(true); };
+  const handleStop = () => { if (window.confirm("Vuoi terminare il workout?")) onFinish(); };
+  const toggleFullScreen = () => setIsFullScreen(prev => !prev);
+
+  // --- Inizio prep automatico se non iOS o se utente ha accettato ---
+  useEffect(() => {
+    if (isIOS() && !hasAgreedToStart) return;
+    setIsPrep(true); setTimeRemaining(PREP_TIME); setIsRunning(true); setIsRest(false);
+  }, [hasAgreedToStart, PREP_TIME]);
+
+  // --- BOOLEANI DI RENDER ---
+  const showNoWorkout = groupIds.length === 0;
+  const showIOSStart = isIOS() && !hasAgreedToStart;
+  const showPrepUI = isPrep && !showIOSStart && !showNoWorkout;
+
+
+  // Render iOS/Start
+if (isIOS() && !hasAgreedToStart) {
+  return (
+    <div className="text-center text-white flex flex-col items-center justify-center h-screen p-4">
+      <h2 className="text-2xl font-bold mb-4">Attenzione!</h2>
+      <div className="bg-gray-800 p-6 rounded-2xl shadow-lg mb-6">
+        <p className="text-lg mb-4">
+          Per evitare che lo schermo si spenga durante l'allenamento, disattiva il blocco automatico.
+        </p>
+        <p className="text-sm text-gray-400">
+          Vai su Impostazioni {'>'} Schermo e Luminosità {'>'} Blocco automatico e seleziona Mai.
+        </p>
+      </div>
+      <button
+        onClick={() => {
+          setHasAgreedToStart(true);
+          setIsPrep(true);
+          setTimeRemaining(PREP_TIME);
+          setIsRunning(true);
+          setIsRest(false);
+        }}
+        className="bg-green-600 text-white px-6 py-3 rounded-lg text-lg font-semibold"
+      >
+        OK, Inizia Workout
+      </button>
+    </div>
+  );
+}
+
+
+  // --- JSX UNICO ---
+  return (
+    <div className={`text-center text-white p-4 transition-all duration-500 ease-in-out ${isFullScreen ? 'fixed top-0 left-0 w-full h-screen bg-black z-50 flex flex-col justify-center items-center' : ''}`}>
+      {/* Fullscreen toggle sempre visibile */}
+      <button
+        onClick={toggleFullScreen}
+        className={`fixed top-4 right-4 bg-gray-700 rounded-full p-2 z-50`}
+      >
+        {isFullScreen ? <Minimize className="w-6 h-6 text-white" /> : <Maximize className="w-6 h-6 text-white" />}
+      </button>
+
+      <div className={`${isFullScreen ? 'w-full h-full flex flex-col justify-center items-center' : 'w-full max-w-sm mx-auto'}`}>
+        {/* Info set/esercizio */}
+        {!isPrep && (
+          <div className="mb-2">
+            <span className="text-sm text-gray-300">Set {currentSet} / {currentTotalSet}</span>
+            <span className="ml-4 text-sm text-gray-300">Esercizio {currentExerciseIndex + 1} / {currentGroup.length}</span>
           </div>
+        )}
+
+        {/* Progress bar del gruppo */}
+        <div className="flex gap-1 mb-4">
+          {currentGroup.map((ex, idx) => (
+            <div
+              key={idx}
+              className={`flex-1 h-2 rounded-full transition-colors ${idx < currentExerciseIndex ? "bg-gray-600" :
+                  idx === currentExerciseIndex ? (isRest ? "bg-yellow-400" : "bg-green-500") : "bg-gray-300"
+                }`}
+            />
+          ))}
         </div>
 
+        {/* Timer principale */}
+        <div className="bg-gray-800 p-6 rounded-2xl shadow-lg mb-4 w-full">
+          {isPrep ? (
+            <>
+              <h2 className="text-xl font-bold mb-4">Preparati</h2>
+              <div className="text-6xl font-extrabold">
+                {timeRemaining !== null ? `${timeRemaining}s` : "--"}
+              </div>
+            </>
+          ) : (
+            <>
+              <h3 className="text-lg font-semibold mb-4 flex items-center justify-center">
+                  {isRest ? (
+                    <div className="flex items-center">
+                      <Clock className="inline-block w-5 h-5 text-yellow-400 mr-2" />
+                      <span>Riposo</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center">
+                      <Dumbbell className="inline-block w-5 h-5 text-green-400 mr-2" />
+                      <span>{currentExercise?.Esercizio}</span>
+                    </div>
+                  )}
+              </h3>
+              <div className="text-4xl font-bold mb-2">
+                {currentExercise?.Unita === "SEC" || isRest ? (
+                  <span>{timeRemaining !== null ? `${timeRemaining}s` : "--"}</span>
+                ) : (
+                  <span>{currentExercise?.Volume} reps</span>
+                )}
+              </div>
+              {!isRest && currentExercise?.Unita === "REPS" && (
+                <button onClick={handleRepsDone} className="mt-3 bg-green-600 text-white px-5 py-2 rounded-lg w-full">Fatto</button>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Controlli principali */}
         <div className="flex justify-center gap-3">
-          {/** Play/Pause utili anche nella prep */}
+          <button onClick={goPrevExercise} className="w-14 h-14 bg-gray-600 rounded-full flex items-center justify-center">
+            <SkipBack className="w-6 h-6" />
+          </button>
           {isRunning ? (
-            <button onClick={() => setIsRunning(false)} className="w-12 h-12 bg-yellow-600 rounded-full flex items-center justify-center">
+            <button onClick={() => setIsRunning(false)} className="w-14 h-14 bg-yellow-600 rounded-full flex items-center justify-center">
               <Pause className="w-6 h-6" />
             </button>
           ) : (
-            <button onClick={() => setIsRunning(true)} className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center">
+            <button onClick={() => setIsRunning(true)} className="w-14 h-14 bg-green-600 rounded-full flex items-center justify-center">
               <Play className="w-6 h-6" />
             </button>
           )}
+          <button onClick={goNextExercise} className="w-14 h-14 bg-blue-600 rounded-full flex items-center justify-center">
+            <SkipForward className="w-6 h-6" />
+          </button>
         </div>
 
         <div className="mt-6">
-          <button onClick={handleStop} className="bg-red-600 px-6 py-2 rounded-lg text-white">Annulla</button>
+          <button onClick={handleStop} className="bg-red-600 px-6 py-2 rounded-lg text-white w-full">Termina Workout</button>
         </div>
-      </div>
-    );
-  }
-
-
-  // Altrimenti mostriamo la UI dell'esercizio / rest
-  return (
-    <div className="text-center text-white">
-      <h2 className="text-xl font-bold mb-2">
-        Set {currentSet} / {currentTotalSet}
-      </h2>
-
-      <div className="bg-gray-800 p-6 rounded-2xl shadow-lg mb-4">
-        <h3 className="text-lg font-semibold mb-4">
-          {isRest ? (
-            <>
-              <Clock className="inline-block w-5 h-5 text-yellow-400 mr-2" /> Riposo
-            </>
-          ) : (
-            <>
-              <Dumbbell className="inline-block w-5 h-5 text-green-400 mr-2" /> {currentExercise?.Esercizio}
-            </>
-          )}
-        </h3>
-
-        <div className="text-4xl font-bold mb-2">
-          {currentExercise?.Unita === "SEC" || isRest ? (
-            <span>{timeRemaining !== null ? `${timeRemaining}s` : "--"}</span>
-          ) : (
-            <span>{currentExercise?.Volume} reps</span>
-          )}
-        </div>
-
-        {!isRest && currentExercise?.Unita === "REPS" && (
-          <button onClick={handleRepsDone} className="mt-3 bg-green-600 text-white px-5 py-2 rounded-lg">Fatto</button>
-        )}
-      </div>
-
-      <div className="flex justify-center gap-3">
-        <button onClick={handlePrev} className="w-12 h-12 bg-gray-600 rounded-full flex items-center justify-center">
-          <SkipBack className="w-6 h-6" />
-        </button>
-
-        {isRunning ? (
-          <button onClick={() => setIsRunning(false)} className="w-12 h-12 bg-yellow-600 rounded-full flex items-center justify-center">
-            <Pause className="w-6 h-6" />
-          </button>
-        ) : (
-          <button onClick={() => setIsRunning(true)} className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center">
-            <Play className="w-6 h-6" />
-          </button>
-        )}
-
-        <button onClick={handleNext} className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center">
-          <SkipForward className="w-6 h-6" />
-        </button>
-      </div>
-
-      <div className="mt-6">
-        <button onClick={handleStop} className="bg-red-600 px-6 py-2 rounded-lg text-white">Termina Workout</button>
       </div>
     </div>
+
   );
 }

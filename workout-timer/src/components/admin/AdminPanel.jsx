@@ -9,7 +9,7 @@ import Header from "../Header";
 import UserProfile from "../../hooks/UserProfile";
 import Sidebar from "../Sidebar";
 import WorkoutEditor from "./WorkoutEditor"
-
+import AddUserForm from "../AddUserForm";
 
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -246,6 +246,7 @@ const handleSaveWorkout = async (updatedData) => {
         {view === "users" && (
           <div className="p-4 rounded-2xl">
             <h2 className="text-2xl font-bold mb-4">Lista Utenti</h2>
+
             {userList.length === 0 ? (
               <p>Nessun utente registrato.</p>
             ) : (
@@ -300,7 +301,7 @@ const handleSaveWorkout = async (updatedData) => {
           </div>
         )}
         
-        {/*--- Sezione JSX per creazione o modifica workout*/}        
+    {/*--- Sezione JSX per creazione o modifica workout*/}        
         {(view === "create" || view === "edit") && selectedUser && (
           <div>
             <button
