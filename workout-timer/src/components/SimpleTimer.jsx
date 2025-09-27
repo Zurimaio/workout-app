@@ -36,11 +36,30 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [hasAgreedToStart, setHasAgreedToStart] = useState(false);
 
+  const [phaseStartTime, setPhaseStartTime] = useState(null);
+  const [phaseDuration, setPhaseDuration] = useState(0);
+
   useWakeLock(isRunning);
 
   const isIOS = () =>
     /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+
+  // chiedi permesso
+  if ("Notification" in window && Notification.permission !== "granted") {
+    Notification.requestPermission();
+  }
+
+  // Notifications support
+  const notify = (title, body) => {
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification(title, { body });
+    } else {
+      setShowIOSNotification(true);
+    }
+  };
+
 
   // Funzione beep
   const playBeep = async (frequency = 440, duration = 200) => {
@@ -67,7 +86,10 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
 
     if (timeRemaining > 0) {
       // beep negli ultimi 3 secondi
-      if (timeRemaining <= 3) playBeep(880, 120);
+      if (timeRemaining <= 3) {
+        playBeep(880, 120);
+        vibrate([150]); // vibrazione singola lunga
+      }
       const t = setTimeout(tick, 1000);
       return () => clearTimeout(t);
     }
@@ -87,6 +109,12 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
 
   }, [timeRemaining, isRunning, isPrep, isRest, currentExercise]);
 
+
+  const vibrate = (pattern = [200]) => {
+    if ("vibrate" in navigator) {
+      navigator.vibrate(pattern);
+    }
+  };
 
 
   // Funzioni helper
@@ -113,6 +141,7 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
     }
 
     playBeep(880, 700);
+    vibrate([300, 100, 300]); // vibrazione doppia
   };
 
   const startRest = () => {
@@ -121,6 +150,8 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
     setTimeRemaining(currentExercise?.Rest ?? 30);
     setIsRunning(true);
     playBeep(880, 500);
+    vibrate([500]); // vibrazione singola lunga
+
   };
 
   // NEXT / PREV Exercise
@@ -201,33 +232,63 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
 
 
   // Render iOS/Start
-if (isIOS() && !hasAgreedToStart) {
-  return (
-    <div className="text-center text-white flex flex-col items-center justify-center h-screen p-4">
-      <h2 className="text-2xl font-bold mb-4">Attenzione!</h2>
-      <div className="bg-gray-800 p-6 rounded-2xl shadow-lg mb-6">
-        <p className="text-lg mb-4">
-          Per evitare che lo schermo si spenga durante l'allenamento, disattiva il blocco automatico.
-        </p>
-        <p className="text-sm text-gray-400">
-          Vai su Impostazioni {'>'} Schermo e Luminosità {'>'} Blocco automatico e seleziona Mai.
-        </p>
+  if (isIOS() && !hasAgreedToStart) {
+    return (
+      <div className="text-center text-white flex flex-col items-center justify-center h-screen p-4">
+        <h2 className="text-2xl font-bold mb-4">Attenzione!</h2>
+        <div className="bg-gray-800 p-6 rounded-2xl shadow-lg mb-6">
+          <p className="text-lg mb-4">
+            Per evitare che lo schermo si spenga durante l'allenamento, disattiva il blocco automatico.
+          </p>
+          <p className="text-sm text-gray-400">
+            Vai su Impostazioni {'>'} Schermo e Luminosità {'>'} Blocco automatico e seleziona Mai.
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            setHasAgreedToStart(true);
+            setIsPrep(true);
+            setTimeRemaining(PREP_TIME);
+            setIsRunning(true);
+            setIsRest(false);
+          }}
+          className="bg-green-600 text-white px-6 py-3 rounded-lg text-lg font-semibold"
+        >
+          OK, Inizia Workout
+        </button>
       </div>
-      <button
-        onClick={() => {
-          setHasAgreedToStart(true);
-          setIsPrep(true);
-          setTimeRemaining(PREP_TIME);
-          setIsRunning(true);
-          setIsRest(false);
-        }}
-        className="bg-green-600 text-white px-6 py-3 rounded-lg text-lg font-semibold"
-      >
-        OK, Inizia Workout
-      </button>
-    </div>
-  );
-}
+    );
+  }
+
+
+
+
+  const startPhase = (duration, type) => {
+    setPhaseDuration(duration);
+    setPhaseStartTime(Date.now());
+    setIsPrep(type === "prep");
+    setIsRest(type === "rest");
+    setIsRunning(true);
+
+    if ("Notification" in window && Notification.permission === "granted") {
+      const title = type === "prep" ? "Preparati!" :
+        type === "rest" ? "Riposo" : "Esercizio";
+      new Notification(title, { body: currentExercise?.Esercizio || "" });
+    }
+  };
+
+  // Avvio fase prep solo al mount o quando haAgreedToStart cambia
+  useEffect(() => {
+    if (isIOS() && !hasAgreedToStart) return;
+    startPhase(PREP_TIME, "prep");
+  }, [hasAgreedToStart, PREP_TIME]);
+
+  // richiedi permesso all’avvio della PWA
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission !== "granted") {
+      Notification.requestPermission();
+    }
+  }, []);
 
 
   // --- JSX UNICO ---
@@ -256,7 +317,7 @@ if (isIOS() && !hasAgreedToStart) {
             <div
               key={idx}
               className={`flex-1 h-2 rounded-full transition-colors ${idx < currentExerciseIndex ? "bg-gray-600" :
-                  idx === currentExerciseIndex ? (isRest ? "bg-yellow-400" : "bg-green-500") : "bg-gray-300"
+                idx === currentExerciseIndex ? (isRest ? "bg-yellow-400" : "bg-green-500") : "bg-gray-300"
                 }`}
             />
           ))}
@@ -274,17 +335,17 @@ if (isIOS() && !hasAgreedToStart) {
           ) : (
             <>
               <h3 className="text-lg font-semibold mb-4 flex items-center justify-center">
-                  {isRest ? (
-                    <div className="flex items-center">
-                      <Clock className="inline-block w-5 h-5 text-yellow-400 mr-2" />
-                      <span>Riposo</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center">
-                      <Dumbbell className="inline-block w-5 h-5 text-green-400 mr-2" />
-                      <span>{currentExercise?.Esercizio}</span>
-                    </div>
-                  )}
+                {isRest ? (
+                  <div className="flex items-center">
+                    <Clock className="inline-block w-5 h-5 text-yellow-400 mr-2" />
+                    <span>Riposo</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center">
+                    <Dumbbell className="inline-block w-5 h-5 text-green-400 mr-2" />
+                    <span>{currentExercise?.Esercizio}</span>
+                  </div>
+                )}
               </h3>
               <div className="text-4xl font-bold mb-2">
                 {currentExercise?.Unita === "SEC" || isRest ? (
