@@ -383,6 +383,11 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
         <div className="mt-6">
           <button onClick={handleStop} className="bg-red-600 px-6 py-2 rounded-lg text-white w-full">Termina Workout</button>
         </div>
+
+        {/* 👇 QUI il debug */}
+      <div style={{color:"white", fontSize:"12px", marginTop:"20px"}}>
+        DEBUG: {JSON.stringify({isRunning, timeRemaining, currentExerciseIndex})}
+      </div>
       </div>
     </div>
 
