@@ -48,9 +48,9 @@ export default function MyWorkouts({ onPreview, onStart }) {
       <LoadingOverlay isVisible={loading} />
 
       {/* Titolo */}
-      <h2 className="text-3xl font-bold mb-6 text-offwhite md:text-gray-900">Le mie Schede</h2>
+      <h2 className="text-3xl font-bold mb-6 text-offwhite">Le mie Schede</h2>
 
-      {loading && <p className="text-gray-500">Caricamento in corso...</p>}
+      {loading && <p>Caricamento in corso...</p>}
 
       {!loading && !workouts.length && (
         <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">

@@ -15,7 +15,7 @@ export const useWakeLock = (isActive) => {
 
                     // Rilascia automaticamente il lock se l'utente cambia tab
                     sentinel.addEventListener('release', () => {
-                        console.log('Wake Lock was released');
+                        // console.log('Wake Lock was released');
                         setWakeLock(null);
                     });
                 } catch (err) {
@@ -28,7 +28,7 @@ export const useWakeLock = (isActive) => {
             if (sentinel) {
                 sentinel.release();
                 setWakeLock(null);
-                console.log('Wake Lock released');
+                // console.log('Wake Lock released');
             }
         };
 

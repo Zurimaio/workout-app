@@ -124,10 +124,6 @@ export default function Dashboard() {
               <div className="p-6 bg-brand text-white rounded-xl shadow-lg"> {/* Sfondo bianco su mobile */}
                 <h2 className="text-2xl font-bold mb-4 text-white">Il tuo Profilo</h2>
                 <p className="text-sm">Email: {user?.email}</p>
-                    {/* Placeholder per altre info */}
-                    <div className="mt-4 p-3 bg-brand-dark border-l-4 border-brand-accent rounded">
-                        <p className="font-medium">Ruolo: {role.toUpperCase()}</p>
-                    </div>
               </div>
             )}
 

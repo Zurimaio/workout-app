@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { Dumbbell, Repeat, Clock, PauseCircle, StickyNote, Play, RefreshCcw } from "lucide-react";
 import SimpleTimer from "./SimpleTimer"; // importa il timer semplice
 
@@ -8,25 +8,32 @@ export default function PreviewWorkout({ workoutData, onStart, onReload }) {
   const [audioCtx, setAudioCtx] = useState(null);
 
    
-    const handleEnableAudio = () => {
-   if (!audioCtx) {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
 
-    // Hack: crea un suono silenzioso per sbloccare l'audio su Safari/iOS
-    const buffer = ctx.createBuffer(1, 1, 22050);
-    const source = ctx.createBufferSource();
-    source.buffer = buffer;
-    source.connect(ctx.destination);
-    source.start(0);
 
-    ctx.resume().then(() => {
-      console.log("🔊 AudioContext attivo:", ctx.state);
-      setAudioCtx(ctx);
-    }).catch(err => {
-      console.error("Errore attivazione AudioContext:", err);
-    });
-  }
+  const handleEnableAudio = async () => {
+    if (!audioCtx) {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const buffer = ctx.createBuffer(1, 1, 22050);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(0);
+
+      try {
+        await ctx.resume();
+        console.log("🔊 AudioContext attivo:", ctx.state);
+        setAudioCtx(ctx);
+      } catch (err) {
+        console.error("Errore attivazione AudioContext:", err);
+      }
+    } else if (audioCtx.state === "suspended") {
+      await audioCtx.resume();
+    }
   };
+
+
+
+  
 
   const handleFullScreen = () => {
     setIsFullScreen(!isFullScreen);
