@@ -29,15 +29,7 @@ export default function PreviewWorkout({ workoutData, onStart, onReload }) {
   };
 
   const handleFullScreen = () => {
-    if (containerRef.current) {
-      if (document.fullscreenElement) {
-        document.exitFullscreen();
-      } else {
-        containerRef.current.requestFullscreen().catch((err) => {
-          console.error("Errore nel full screen:", err);
-        });
-      }
-    }
+    setIsFullScreen(!isFullScreen);
   };
 
   const handleFinishGroup = () => {
@@ -170,12 +162,12 @@ export default function PreviewWorkout({ workoutData, onStart, onReload }) {
               🔄 Ricarica
             </button>
           )}
-          <button
+        {/*   <button
             onClick={handleFullScreen}
             className="bg-blue-600 text-white px-6 py-3 rounded-xl shadow-lg hover:bg-blue-700 transition flex items-center gap-2"
           >
             ⛶ Full Screen
-          </button>
+          </button> */}
         </div>
       )}
     </div>
