@@ -46,12 +46,9 @@ export default function MobileBar({ menuItems, currentView, setView }) {
 
   // Handler personalizzato per intercettare il click su "profile"
   const handleNavClick = (key) => {
-    if (key === "profile") {
-      setShowProfileMenu(true);
-      console.log("profile")
-    } else {
+   
       setView(key);
-    }
+    
   };
 
   return (
@@ -62,21 +59,7 @@ export default function MobileBar({ menuItems, currentView, setView }) {
         currentView={currentView}
         setView={handleNavClick}
       />
-
-      {/* Drawer/overlay quando clicchi su "Profilo" */}
-      {showProfileMenu && (
-        <div className="fixed inset-0 bg-black/50 z-40 flex justify-end">
-          <div className="w-64 bg-white h-full shadow-xl p-4">
-            <ProfileMenu />
-            <button
-              className="mt-4 text-sm text-gray-500"
-              onClick={() => setShowProfileMenu(false)}
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      )}
+      
     </>
   );
 }

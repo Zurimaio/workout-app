@@ -95,21 +95,6 @@ export default function MyWorkouts({ onPreview, onStart }) {
                   <Eye className="w-5 h-5 md:w-4 md:h-4" />  Anteprima
                 </button>
               </div>
-          <div key={w.id} className="flex justify-between items-center rounded shadow p-2 hover:bg-brand-light">
-            <span>{w.name || `Workout ${w.id}`}</span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => onPreview(w.groups)}
-                className="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600"
-              >
-                Preview
-              </button>
-              {/* <button
-                onClick={() => {onStart(w.groups); } }
-                className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
-              >
-                Avvia
-              </button> */}
             </div>
           </div>
         ))}
