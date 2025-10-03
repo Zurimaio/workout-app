@@ -65,8 +65,6 @@ export default function MyWorkouts({ onPreview, onStart }) {
         {/* CARD: Mobile Scuro/Grande vs Desktop Chiaro/Compatto */}
         {/* ATTENZIONE: key e className sono ora sulla stessa riga per evitare l'errore 69:12 */}
         {workouts.map(w => (
-
-
           <div key={w.id}
             className="bg-brand-dark md:bg-brand-dark rounded-xl shadow-xl md:shadow-md p-5 md:p-3 transition duration-300 hover:shadow-2xl md:hover:shadow-lg"
           >
