@@ -165,10 +165,10 @@ export default function CreateWorkout({ selectedUser, onGenerated }) {
 
         <input
           type="text"
-          placeholder="Nome workout"
+          placeholder="Nome workoutt"
           value={workoutName}
           onChange={(e) => setWorkoutName(e.target.value)}
-          className="border p-2 rounded mb-2 w-full"
+          className="text-gray-600 placeholder-gray-600 border p-2 rounded mb-2 w-full"
         />
 
 
@@ -179,7 +179,7 @@ export default function CreateWorkout({ selectedUser, onGenerated }) {
         >
           Aggiungi nuovo gruppo
         </button>
-      </div>
+      </div> 
 
       <div className="flex flex-col gap-2 mb-4">
         <input
