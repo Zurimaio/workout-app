@@ -110,13 +110,12 @@ export default function WorkoutEditor({ selectedUser, initialData = null, onSave
         if (!workoutName) return alert("Inserisci un nome per il workout");
         if (!selectedUser) return alert("Seleziona un utente");
         const userWorkoutsRef = collection(db, "workouts", selectedUser.id, "userWorkouts");
-        const workoutDocRef = doc(userWorkoutsRef, initialData?.id);
         try {
 
             if (initialData?.id) {
                 console.log("initialData", initialData);
+                const workoutDocRef = doc(userWorkoutsRef, initialData?.id);
                 // 📝 UPDATE su workout esistente
-
                 await setDoc(
                     workoutDocRef,
                     {
@@ -151,7 +150,7 @@ export default function WorkoutEditor({ selectedUser, initialData = null, onSave
                 placeholder="Nome workout"
                 value={workoutName}
                 onChange={e => setWorkoutName(e.target.value)}
-                className="border p-2 rounded w-full mb-4"
+                className="border p-2 rounded w-full mb-4 text-brand"
             />
 
             {Object.entries(groups).map(([groupId, exercises]) => (
