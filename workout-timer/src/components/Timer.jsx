@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useReducer, useCallback } from "rea
 import { FaPlay, FaPause, FaStop } from "react-icons/fa";
 import { MdNavigateBefore, MdNavigateNext } from "react-icons/md";
 import { motion, AnimatePresence } from "framer-motion";
+import { getGroupTag } from "../style/getGroupTag";
 
 // Definizione degli stati del timer
 const TIMER_STATES = {
@@ -318,6 +319,24 @@ export default function Timer({ workoutData, onExit }) {
 
       {(timerState === TIMER_STATES.RUNNING || timerState === TIMER_STATES.PAUSED || timerState === TIMER_STATES.RESTING || timerState === TIMER_STATES.WAITING_NEXT_GROUP) && (
         <>
+          {/* Etichetta tipo gruppo */}
+          {currentGroup && (
+            <div className="mb-3 flex items-center justify-center">
+              {(() => {
+                const tag = getGroupTag(groupIds[currentGroupIndex]);
+                return (
+                  <span
+                    className={`flex items-center gap-2 ${tag.color} text-white text-sm font-semibold px-4 py-1.5 rounded-full shadow-lg uppercase tracking-wide`}
+                  >
+                    <span>{tag.icon}</span>
+                    {tag.label}
+                  </span>
+                );
+              })()}
+            </div>
+          )}
+
+
           <h1 className="text-2xl font-bold mb-2">Workout in corso</h1>
           <h2 className="text-lg mb-4">
             Gruppo {groupIds[currentGroupIndex]} – Set {currentSet} di {currentExercise.set}

@@ -14,14 +14,15 @@ import {
 
 import { useWakeLock } from "../utils/useWaveLock";
 import { requestNotificationPermission, notify } from "../utils/notify";
+import { getGroupTag } from "../style/getGroupTag";
 
 
-export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime = 5 }) {
+export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime = 10 }) {
   const PREP_TIME = prepTime;
 
   const groupIds = Object.keys(workoutData || {});
   const currentGroup = workoutData[groupIds[0]];
-
+  const currentGroupName = workoutData.type;
   const [currentGroupIndex, setCurrentGroupIndex] = useState(0);
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [currentSet, setCurrentSet] = useState(1);
@@ -35,14 +36,15 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
   const currentExercise = currentGroupData?.[currentExerciseIndex];
   const currentTotalSet = currentExercise?.set || 1;
 
+
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [hasAgreedToStart, setHasAgreedToStart] = useState(false);
 
   useWakeLock(isRunning);
 
-  // useEffect(() => {
-  //   requestNotificationPermission();
-  // }, []);
+  useEffect(() => {
+    console.log(currentGroupData)
+  }, []);
 
   useEffect(() => {
     if (!audioCtx) return;
@@ -283,6 +285,20 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
       </button>
 
       <div className={`${isFullScreen ? 'w-full h-full flex flex-col justify-center items-center' : 'w-full max-w-sm mx-auto'}`}>
+        {/* Tag gruppo */}
+          <div className="mb-2">
+            {(() => {
+              const tag = getGroupTag(currentGroupName);
+              return (
+                <span className={`inline-flex items-center gap-1 ${tag.color} text-white text-xs font-semibold px-3 py-1 rounded-full shadow-md uppercase tracking-wide`}>
+                  <span>{tag.icon}</span> {tag.label}
+                </span>
+              );
+            })()}
+          </div>
+        
+        
+        
         {/* Info set/esercizio */}
         {!isPrep && (
           <div className="mb-2">
@@ -341,6 +357,15 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
           )}
         </div>
 
+        {/* Note esercizio */}
+        {!isRest && currentExercise?.Note && (
+          <div className="mt-2 text-sm text-gray-300 text-left bg-gray-900 p-3 rounded-lg max-w-sm mx-auto">
+            <details>
+              <summary className="cursor-pointer font-semibold text-gray-200">Note esercizio</summary>
+              <p className="mt-2 text-gray-400 whitespace-pre-line">{currentExercise.Note}</p>
+            </details>
+          </div>
+        )}
         {/* Controlli principali */}
         <div className="flex justify-center gap-3">
           <button onClick={goPrevExercise} className="w-14 h-14 bg-gray-600 rounded-full flex items-center justify-center">

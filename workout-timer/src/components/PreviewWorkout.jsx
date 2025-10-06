@@ -1,6 +1,8 @@
 import React, { useRef, useState, useEffect } from "react";
 import { Dumbbell, Repeat, Clock, PauseCircle, StickyNote, Play, RefreshCcw } from "lucide-react";
 import SimpleTimer from "./SimpleTimer"; // importa il timer semplice
+import { getGroupTag } from "../style/getGroupTag";
+
 
 export default function PreviewWorkout({ workoutData, onStart, onReload }) {
   const containerRef = useRef(null);
@@ -42,22 +44,7 @@ export default function PreviewWorkout({ workoutData, onStart, onReload }) {
     setActiveGroup(null); // chiude il timer e torna alla preview
   };
 
-  const getGroupTag = (name) => {
-    const normalized = name?.toLowerCase() || "";
-
-    if (normalized.includes("emom"))
-      return { label: "EMOM", color: "bg-blue-600", icon: <Repeat className="w-4 h-4" /> };
-    if (normalized.includes("tabata"))
-      return { label: "TABATA", color: "bg-red-600", icon: <Clock className="w-4 h-4" /> };
-    if (normalized.includes("amrap"))
-      return { label: "AMRAP", color: "bg-yellow-500", icon: <RefreshCcw className="w-4 h-4" /> };
-    if (normalized.includes("interval"))
-      return { label: "INTERVAL TRAINING", color: "bg-green-600", icon: <Play className="w-4 h-4" /> };
-
-    return { label: "STANDARD", color: "bg-gray-600", icon: <Dumbbell className="w-4 h-4" /> };
-  };
-
-
+  
 
   return (
     <div ref={containerRef} className="p-6 max-w-4xl mx-auto relative">
@@ -73,7 +60,7 @@ export default function PreviewWorkout({ workoutData, onStart, onReload }) {
             {activeGroup.name}
           </h2>
           <SimpleTimer
-            workoutData={{ [activeGroup.id]: activeGroup.exercises }}
+            workoutData={{ [activeGroup.id]: activeGroup.exercises, type: activeGroup.type}}
             onFinish={handleFinishGroup}
             audioCtx={audioCtx}
           />
@@ -159,7 +146,7 @@ export default function PreviewWorkout({ workoutData, onStart, onReload }) {
                   <button
                     onClick={() => {
                       handleEnableAudio(); // sblocca audio
-                      setActiveGroup({ id: groupId, exercises, name: exercises.map(ex => ex.Esercizio).join(" • "), })
+                      setActiveGroup({ id: groupId, exercises, name: exercises.map(ex => ex.Esercizio).join(" • "), type: groupName })
                     }}
                     className="bg-green-600 text-white px-6 py-2 rounded-xl shadow hover:bg-green-700 flex items-center gap-2"
                   >
