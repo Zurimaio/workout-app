@@ -10,7 +10,7 @@ export default function WorkoutEditor({ selectedUser, initialData = null, onSave
     const [editingExercise, setEditingExercise] = useState(null); // {groupId, index}
     const [exerciseDB, setExerciseDB] = useState({});
     const [editedWorkout, setEditedWorkout] = useState(false);
-    const [workoutData, setWorkoutData] = useState(null);
+
     // --- Carica DB esercizi
     useEffect(() => {
         const loadDb = async () => {
@@ -25,10 +25,30 @@ export default function WorkoutEditor({ selectedUser, initialData = null, onSave
         loadDb();
     }, []);
 
+    // --- Normalizza vecchi dati caricati (retrocompatibilità)
+useEffect(() => {
+    if (groups && typeof groups === "object") {
+        const fixedGroups = {};
+        for (const [id, value] of Object.entries(groups)) {
+            if (Array.isArray(value)) {
+                // Vecchio formato: era un array di esercizi
+                fixedGroups[id] = { name: `Gruppo ${id}`, exercises: value };
+            } else {
+                // Nuovo formato: già corretto
+                fixedGroups[id] = value;
+            }
+        }
+        setGroups(fixedGroups);
+    }
+}, []);
+
     // --- Aggiungi gruppo
     const handleAddGroup = () => {
         const newId = Math.max(...Object.keys(groups).map(Number), 0) + 1;
-        setGroups(prev => ({ ...prev, [newId]: [] }));
+        setGroups(prev => ({
+            ...prev,
+            [newId]: { name: `Gruppo ${newId}`, exercises: [] }
+        }));
         setCurrentGroup(newId.toString());
     };
 
@@ -54,49 +74,66 @@ export default function WorkoutEditor({ selectedUser, initialData = null, onSave
             preSaved: true,
         };
         setGroups(prev => {
-            const newGroupExercises = [...(prev[groupId] || []), newExercise];
+            const newGroupExercises = [...(prev[groupId]?.exercises || []), newExercise];
             setEditingExercise({ groupId, index: newGroupExercises.length - 1 });
-            return { ...prev, [groupId]: newGroupExercises };
+            return {
+                ...prev,
+                [groupId]: { ...prev[groupId], exercises: newGroupExercises }
+            };
         });
     };
 
     // --- Rimuovi esercizio
     const handleRemoveExercise = (groupId, index) => {
         setGroups(prev => {
-            const updatedGroup = [...prev[groupId]];
+            const updatedGroup = [...prev[groupId].exercises];
             updatedGroup.splice(index, 1);
-            return { ...prev, [groupId]: updatedGroup };
+            return {
+                ...prev,
+                [groupId]: { ...prev[groupId], exercises: updatedGroup }
+            };
         });
     };
 
     // --- Modifica esercizio
     const handleChangeExercise = (groupId, index, field, value) => {
         setGroups(prev => {
-            const updatedGroup = [...prev[groupId]];
+            const updatedGroup = [...prev[groupId].exercises];
             updatedGroup[index] = { ...updatedGroup[index], [field]: value };
 
-            // Reset automatico dei dropdown
             if (field === "Ambito") {
                 updatedGroup[index].Pilastro = "";
                 updatedGroup[index].Esercizio = "";
             }
             if (field === "Pilastro") updatedGroup[index].Esercizio = "";
 
-
-            // Variabile generica che indica che il workout è stato modificato
             setEditedWorkout(true);
-            return { ...prev, [groupId]: updatedGroup };
+            return {
+                ...prev,
+                [groupId]: { ...prev[groupId], exercises: updatedGroup }
+            };
         });
     };
 
     // --- Salva esercizio pre-saved
     const handleSaveExercise = (groupId, index) => {
         setGroups(prev => {
-            const updatedGroup = [...prev[groupId]];
+            const updatedGroup = [...prev[groupId].exercises];
             updatedGroup[index].preSaved = false;
-            return { ...prev, [groupId]: updatedGroup };
+            return {
+                ...prev,
+                [groupId]: { ...prev[groupId], exercises: updatedGroup }
+            };
         });
         setEditingExercise(null);
+    };
+
+    // --- Cambia nome gruppo
+    const handleChangeGroupName = (groupId, value) => {
+        setGroups(prev => ({
+            ...prev,
+            [groupId]: { ...prev[groupId], name: value }
+        }));
     };
 
     // --- Filtri dinamici dal DB
@@ -111,11 +148,8 @@ export default function WorkoutEditor({ selectedUser, initialData = null, onSave
         if (!selectedUser) return alert("Seleziona un utente");
         const userWorkoutsRef = collection(db, "workouts", selectedUser.id, "userWorkouts");
         try {
-
             if (initialData?.id) {
-                console.log("initialData", initialData);
                 const workoutDocRef = doc(userWorkoutsRef, initialData?.id);
-                // 📝 UPDATE su workout esistente
                 await setDoc(
                     workoutDocRef,
                     {
@@ -123,7 +157,7 @@ export default function WorkoutEditor({ selectedUser, initialData = null, onSave
                         groups,
                         updatedAt: serverTimestamp(),
                     },
-                    { merge: true } // evita di sovrascrivere campi non passati
+                    { merge: true }
                 );
                 alert("Workout modificato correttamente!");
             } else {
@@ -153,20 +187,26 @@ export default function WorkoutEditor({ selectedUser, initialData = null, onSave
                 className="border p-2 rounded w-full mb-4 text-brand"
             />
 
-            {Object.entries(groups).map(([groupId, exercises]) => (
+            {Object.entries(groups).map(([groupId, group]) => (
                 <div key={groupId} className="mb-6 rounded-lg p-4 bg-brand">
                     <div className="flex justify-between items-center mb-2">
-                        <h3 className="font-semibold">Gruppo {groupId}</h3>
+                        <input
+                            type="text"
+                            value={group.name}
+                            onChange={e => handleChangeGroupName(groupId, e.target.value)}
+                            className="font-semibold text-lg border-b border-gray-300 bg-transparent w-full"
+                            placeholder={`Nome gruppo ${groupId}`}
+                        />
                         <button
                             onClick={() => handleRemoveGroup(groupId)}
-                            className="text-red-500 hover:text-red-700"
+                            className="text-red-500 hover:text-red-700 ml-2"
                         >
                             <Trash2 />
                         </button>
                     </div>
 
                     <div className="flex flex-col gap-2">
-                        {exercises.map((ex, idx) => {
+                        {(group.exercises || []).map((ex, idx) => {
                             const isEditing = ex.preSaved || (editingExercise?.groupId === groupId && editingExercise?.index === idx);
                             return (
                                 <div
@@ -290,9 +330,7 @@ export default function WorkoutEditor({ selectedUser, initialData = null, onSave
 
                                     {/* Azioni */}
                                     <div className="flex items-center gap-1">
-                                        {ex.preSaved || (editingExercise?.groupId === groupId && editingExercise?.index === idx) ? (
-                                            // Mostra SAVE se è un nuovo esercizio (preSaved)
-                                            // oppure se è in fase di editing
+                                        {isEditing ? (
                                             <button
                                                 onClick={() => handleSaveExercise(groupId, idx)}
                                                 className="bg-green-500 text-white px-2 py-1 rounded flex items-center"
@@ -300,7 +338,6 @@ export default function WorkoutEditor({ selectedUser, initialData = null, onSave
                                                 <Save size={16} />
                                             </button>
                                         ) : (
-                                            // Mostra EDIT se non è in editing
                                             <button
                                                 onClick={() => setEditingExercise({ groupId, index: idx })}
                                                 className="bg-blue-500 text-white px-2 py-1 rounded flex items-center"
