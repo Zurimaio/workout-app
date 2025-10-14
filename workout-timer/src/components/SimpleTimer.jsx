@@ -26,16 +26,39 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
   const currentExercise = currentGroupData?.[currentExerciseIndex];
   const currentTotalSet = currentExercise?.set || 1;
 
+
   // --- Refs per background handling ---
   const lastTickRef = useRef(Date.now());
   const visibilityRef = useRef(document.visibilityState);
   const rafRef = useRef(null);
+  // --- AudioContext globale ---
+  const audioCtxRef = useRef(null);
+
+
 
   useWakeLock(isRunning);
 
   const isIOS = () =>
     /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+
+  useEffect(() => {
+    // Inizializzazione sicura
+    if (!audioCtxRef.current) {
+      audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        // Riattiva l’audio se sospeso
+        audioCtxRef.current.resume().catch(() => { });
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
 
   // === PATCH BACKGROUND FIX ===
   useEffect(() => {
@@ -66,6 +89,25 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
   }, [isRunning, timeRemaining]);
 
   // === PATCH BACKGROUND FIX (Visibility + Resume) ===
+
+  useEffect(() => {
+    const unlockAudio = () => {
+      if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
+        audioCtxRef.current.resume().catch(() => { });
+      }
+      document.removeEventListener("touchstart", unlockAudio);
+      document.removeEventListener("click", unlockAudio);
+    };
+
+    document.addEventListener("touchstart", unlockAudio);
+    document.addEventListener("click", unlockAudio);
+
+    return () => {
+      document.removeEventListener("touchstart", unlockAudio);
+      document.removeEventListener("click", unlockAudio);
+    };
+  }, []);
+
   useEffect(() => {
     const handleVisibilityChange = () => {
       // Quando torna in foreground
@@ -87,10 +129,7 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
       }
       visibilityRef.current = document.visibilityState;
 
-      // riprende anche l'audio
-      if (audioCtx && document.visibilityState === "visible" && audioCtx.state === "suspended") {
-        audioCtx.resume().catch(() => { });
-      }
+
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -99,7 +138,7 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", handleVisibilityChange);
     };
-  }, [isRunning, audioCtx]);
+  }, [isRunning]);
   // === END PATCH ===
 
 
@@ -110,6 +149,9 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
   };
 
   const playBeep = async (frequency = 440, duration = 200) => {
+
+    const audioCtx = audioCtxRef.current;
+
     if (!audioCtx) return;
     try { if (audioCtx.state === "suspended") await audioCtx.resume(); } catch { }
     if (audioCtx.state !== "running") return;
@@ -292,8 +334,8 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
   return (
     <div
       className={`text-center text-white p-4 transition-all duration-500 ${isFullScreen
-          ? "fixed top-0 left-0 w-full h-screen bg-black z-50 flex flex-col justify-center items-center"
-          : ""
+        ? "fixed top-0 left-0 w-full h-screen bg-black z-50 flex flex-col justify-center items-center"
+        : ""
         }`}
     >
       {/* --- Bottone Fullscreen --- */}
@@ -310,8 +352,8 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
 
       <div
         className={`${isFullScreen
-            ? "w-full h-full flex flex-col justify-center items-center rounded-none mb-0"
-            : "w-full max-w-sm mx-auto"
+          ? "w-full h-full flex flex-col justify-center items-center rounded-none mb-0"
+          : "w-full max-w-sm mx-auto"
           }`}
       >
         {/* --- TIMER CARD --- */}
@@ -330,6 +372,7 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
           <div className={`font-extrabold tracking-widest ${isFullScreen ? "text-9xl" : "text-7xl"}`}>
             {timeRemaining !== null ? `${timeRemaining}s` : "--"}
           </div>
+
 
           {/* Indicatore di fase */}
           <div className="mt-4">
