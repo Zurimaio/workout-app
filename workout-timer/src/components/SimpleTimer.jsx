@@ -173,23 +173,22 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
   // === PATCH: centralizziamo il cambio fase per background + tick ===
   const finishCurrentPhase = useCallback(() => {
     if (isPrep) {
-      // beep finale prep
+      // Fine preparazione → inizio esercizio
       playBeep(1000, 700);
       vibrate(300);
       startExercise();
     } else if (isRest) {
-      // beep finale riposo → lavoro
-      playBeep(1000, 700);
+      // Fine riposo → prossimo esercizio o set
+      playBeep(1200, 900);
       vibrate(300);
-      goNextExercise(); // parte il prossimo esercizio
-    } else if (currentExercise?.Unita === "SEC") {
-      // fine esercizio a tempo → riposo
-      startRest();
-    } else {
-      // esercizio a reps → prossimo esercizio
       goNextExercise();
+    } else if (currentExercise?.Unita === "SEC") {
+      // Fine esercizio a tempo → parte il riposo
+      startRest();
     }
+    // ❌ Rimosso il ramo per REP — ora aspetta il click "Fatto"
   }, [isPrep, isRest, currentExercise]);
+
 
   // Beep negli ultimi secondi
   useEffect(() => {
@@ -213,16 +212,21 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
   };
 
   const startExercise = () => {
-    setIsPrep(false); setIsRest(false);
+    setIsPrep(false);
+    setIsRest(false);
     if (!currentExercise) return;
+
     if (currentExercise.Unita === "SEC") {
+      // Esercizio a tempo → parte il countdown
       setTimeRemaining(currentExercise.Volume);
       setIsRunning(true);
-    } else {
+    } else if (currentExercise.Unita === "REP") {
+      // Esercizio a ripetizioni → mostra solo il numero, niente timer
       setTimeRemaining(null);
-      setIsRunning(false);
+      setIsRunning(false); // Attende il click "Fatto"
     }
   };
+
 
   const startRest = () => {
     setIsPrep(false); setIsRest(true);
@@ -235,43 +239,64 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
   // --- Navigazione esercizi ---
   const goNextExercise = useCallback(() => {
     if (!currentExercise) return;
-    if (!isRest && currentExercise.Unita === "SEC") {
-      setIsRest(true);
-      setTimeRemaining(currentExercise.Rest ?? 30);
-      setIsRunning(true);
-      return;
-    }
 
     let g = currentGroupIndex;
-    let e = currentExerciseIndex + 1;
+    let e = currentExerciseIndex;
     let s = currentSet;
-    const group = workoutData[groupIds[g]];
-    const isEndOfGroup = e >= group.length;
-    const isEndOfSet = s >= (currentExercise?.set ?? 1);
 
-    if (isEndOfGroup) {
-      if (!isEndOfSet) { e = 0; s++; }
-      else if (g < groupIds.length - 1) { g++; e = 0; s = 1; }
-      else {
-        playBeep(880, 500); playBeep(660, 400);
-        vibrate([200, 100, 200]);
-        setShowWorkoutEnd(true);
-        setIsRunning(false);
-        return;
+    // Se siamo in riposo, passiamo all’esercizio successivo o al set successivo
+    if (isRest) {
+      const group = workoutData[groupIds[g]];
+      const isEndOfGroup = e >= group.length - 1;
+      const isEndOfSet = s >= (currentExercise?.set ?? 1);
+
+      if (isEndOfGroup) {
+        if (!isEndOfSet) {
+          // Prossimo set, ricomincia dal primo esercizio
+          e = 0;
+          s++;
+        } else if (g < groupIds.length - 1) {
+          // Passa al prossimo gruppo
+          g++;
+          e = 0;
+          s = 1;
+        } else {
+          // Fine workout
+          playBeep(880, 500);
+          playBeep(660, 400);
+          vibrate([200, 100, 200]);
+          setShowWorkoutEnd(true);
+          setIsRunning(false);
+          return;
+        }
+      } else {
+        // Passa al prossimo esercizio dello stesso set
+        e++;
       }
-    }
 
-    const nextExercise = workoutData[groupIds[g]][e];
-    if (nextExercise.Unita === "SEC" && e === 0 && s === 1) {
-      setIsPrep(true); setTimeRemaining(PREP_TIME); setIsRunning(true); setIsRest(false);
+      const nextExercise = workoutData[groupIds[g]][e];
+      if (nextExercise.Unita === "SEC") {
+        startPrep();
+      } else {
+        // Anche per REP: si riparte subito con l’esercizio (nessuna prep)
+        setIsPrep(false);
+        setIsRest(false);
+        setTimeRemaining(null);
+        setIsRunning(false);
+      }
+
+      setCurrentGroupIndex(g);
+      setCurrentExerciseIndex(e);
+      setCurrentSet(s);
+    } else if (currentExercise.Unita === "REP") {
+      // Se l’esercizio è a REP e non siamo in riposo, lo segni come completato
+      handleRepsDone();
     } else {
-      setIsPrep(false); setIsRest(false);
-      setTimeRemaining(nextExercise.Unita === "SEC" ? nextExercise.Volume : null);
-      setIsRunning(nextExercise.Unita === "SEC");
+      // Altrimenti gestione classica per esercizi a tempo
+      startRest();
     }
+  }, [isRest, currentExercise, currentGroupIndex, currentExerciseIndex, currentSet, workoutData, groupIds]);
 
-    setCurrentGroupIndex(g); setCurrentExerciseIndex(e); setCurrentSet(s);
-  }, [currentExercise, currentGroupIndex, currentExerciseIndex, currentSet, workoutData, groupIds, PREP_TIME, isRest]);
 
   // --- Altre funzioni UI ---
   const goPrevExercise = useCallback(() => {
@@ -290,7 +315,19 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
     setCurrentGroupIndex(g); setCurrentExerciseIndex(e); setCurrentSet(s);
   }, [currentExercise, currentGroupIndex, currentExerciseIndex, currentSet, workoutData, groupIds, PREP_TIME, isRest]);
 
-  const handleRepsDone = () => { setIsRest(true); setTimeRemaining(currentExercise?.Rest ?? 30); setIsRunning(true); };
+  const handleRepsDone = () => {
+    // Dopo aver fatto le ripetizioni, parte sempre il riposo
+    const restTime = currentExercise?.Rest ?? 30;
+    setIsRest(true);
+    setIsPrep(false);
+    setTimeRemaining(restTime);
+    setIsRunning(true);
+
+    // Suono di passaggio REP → RIPOSO
+    playBeep(750, 300);
+    vibrate(200);
+  };
+
   const handleStop = () => { if (window.confirm("Vuoi terminare il workout?")) onFinish(); };
   const toggleFullScreen = () => setIsFullScreen(prev => !prev);
 
@@ -370,10 +407,25 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
 
           {/* Timer numerico */}
           <div className={`font-extrabold tracking-widest ${isFullScreen ? "text-9xl" : "text-7xl"}`}>
-            {timeRemaining !== null ? `${timeRemaining}s` : "--"}
+            {currentExercise?.Unita === "REP"
+              ? `${currentExercise.Volume}x`
+              : timeRemaining !== null || timeRemaining !== 0
+                ? `${timeRemaining}s`
+                : ""}
           </div>
 
-
+          {/* --- TASTO "FATTO" per esercizi a ripetizioni --- */}
+          {!isRest && !isPrep && currentExercise?.Unita === "REP" && (
+            <div className="mt-6 flex justify-center">
+              <button
+                onClick={handleRepsDone}
+                className="bg-green-500 text-white px-8 py-3 rounded-xl text-lg font-semibold flex items-center gap-2 shadow-lg hover:bg-green-600 transition"
+              >
+                <CheckCircle className="w-6 h-6" />
+                Fatto
+              </button>
+            </div>
+          )}
           {/* Indicatore di fase */}
           <div className="mt-4">
             {isPrep ? (
@@ -418,6 +470,9 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
             <SkipForward className="w-6 h-6" />
           </button>
         </div>
+
+
+
       </div>
     </div>
   );
