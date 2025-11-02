@@ -386,6 +386,7 @@ export default function SimpleTimer({ workoutData, onFinish, audioCtx, prepTime 
           </div>
         </div>
 
+
         {/* --- CONTROLLI --- */}
         <div className="flex justify-center gap-3">
           <button
