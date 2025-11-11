@@ -13,18 +13,18 @@ import Sidebar from "../components/Sidebar"; // Mantenuta per schermi desktop
 import MobileBar from "./MobileBar";
 // Placeholder Statistiche
 function StatsPlaceholder() {
-  return (
-    <div className="p-6 text-white bg-brand-dark rounded-xl shadow-lg m-4">
-      🚧 Statistiche in arrivo...
-    </div>
-  );
+    return (
+        <div className="p-6 text-white bg-brand-dark rounded-xl shadow-lg m-4">
+            🚧 Statistiche in arrivo...
+        </div>
+    );
 }
 
 // --- Componente Principale Dashboard ---
 export default function Dashboard() {
     const { user, role } = useAuth();
     // Inizializziamo 'view' su 'myWorkouts' o lo nascondiamo se è attivo il timer
-    const [view, setView] = useState("myWorkouts"); 
+    const [view, setView] = useState("myWorkouts");
     const [workoutData, setWorkoutData] = useState(null);
     const [myWorkouts, setMyWorkouts] = useState([]);
     const [sidebarOpen, setSidebarOpen] = useState(false); // Mantenuta per schermi grandi (desktop)
@@ -55,81 +55,81 @@ export default function Dashboard() {
         );
     }
 
-  return (
-   <div className="flex h-screen bg-brand-light md:bg-brand overflow-hidden"> 
-        {/* SIDEBAR DESKTOP */}
-        <Sidebar menuItems={menuItems} sidebarOpen={sidebarOpen} setView={setView} setSidebarOpen={setSidebarOpen} />
-        {/* Il toggle della sidebar (MdMenu) non è più necessario in mobile, dato che usiamo la bottom bar fissa */}
+    return (
+        <div className="flex h-screen bg-brand-light md:bg-brand overflow-hidden">
+            {/* SIDEBAR DESKTOP */}
+            <Sidebar menuItems={menuItems} sidebarOpen={sidebarOpen} setView={setView} setSidebarOpen={setSidebarOpen} />
+            {/* Il toggle della sidebar (MdMenu) non è più necessario in mobile, dato che usiamo la bottom bar fissa */}
 
 
-      {/* Content area */}
-      <main className="flex-1 overflow-y-auto p-4 pb-20 md:p-6 md:ml-30 transition-all duration-300"> 
-            
-            {/* Header migliorato (solo per mobile, l'Header desktop è spesso gestito diversamente) */}
-            <div className="mb-6 pt-4"> 
-                <Header
-                    title={`Ciao, ${profile.name || 'Atleta'}! 👋`}
-                    subtitle="Pronto per il tuo allenamento?"
-                    className="text-gray-900" 
-                />
-            </div>
-            
-            {/* Contenuto specifico della vista */}
-            {view === "myWorkouts" && (
-              <MyWorkouts
-                    // Aggiungere un bg-white e shadow-lg per MyWorkouts
-                workouts={myWorkouts}
-                onPreview={(groups) => { setWorkoutData(groups); setView("preview"); }}
-                onStart={(groups) => { setWorkoutData(groups); setView("timer"); setTimerActive(true)}}
-              />
-            )}
+            {/* Content area */}
+            <main className="flex-1 overflow-y-auto p-4 pb-20 md:p-6 md:ml-30 transition-all duration-300">
 
-            {view === "profile" && (
-              <div className="p-6 bg-brand text-white rounded-xl shadow-lg"> {/* Sfondo bianco su mobile */}
-                <h2 className="text-2xl font-bold mb-4 text-white">Il tuo Profilo</h2>
-                <p className="text-sm">Email: {user?.email}</p>
-              </div>
-            )}
+                {/* Header migliorato (solo per mobile, l'Header desktop è spesso gestito diversamente) */}
+                <div className="mb-6 pt-4">
+                    <Header
+                        title={`Ciao, ${profile.name || 'Atleta'}! 👋`}
+                        subtitle="Pronto per il tuo allenamento?"
+                        className="text-gray-900"
+                    />
+                </div>
 
-            {view === "stats" && <StatsPlaceholder />}
+                {/* Contenuto specifico della vista */}
+                {view === "myWorkouts" && (
+                    <MyWorkouts
+                        // Aggiungere un bg-white e shadow-lg per MyWorkouts
+                        workouts={myWorkouts}
+                        onPreview={(groups) => { setWorkoutData(groups); setView("preview"); }}
+                        onStart={(groups) => { setWorkoutData(groups); setView("timer"); setTimerActive(true) }}
+                    />
+                )}
 
-            {/* Logica per Preview e Timer: per mobile, li renderemo a schermo intero se possibile, ma per ora manteniamo il ritorno alla Home */}
-            {(view === "preview" || view === "timer") && workoutData && (
-              <div className="bg-brand p-4 rounded-xl shadow-lg">
-                <button
-                      onClick={() => setView("myWorkouts")}
-                      className="mb-4 text-sm font-medium text-white hover:text-brand-accent transition-colors"
-                >
-                      ← Torna alle Schede
-                </button>
-                    {view === "preview" && (
-                        <PreviewWorkout
-                            workoutData={workoutData}
-                            onStart={() => { setView("timer"); setTimerActive(true)}}
-                            onBack={() => setView("myWorkouts")}
-                        />
-                    )}
-                    {view === "timer" && (
-                        <SimpleTimer workoutData={workoutData} onExit={handleExitTimer} />
-                    )}
-              </div>
-            )}
+                {view === "profile" && (
+                    <div className="p-6 bg-brand text-white rounded-xl shadow-lg"> {/* Sfondo bianco su mobile */}
+                        <h2 className="text-2xl font-bold mb-4 text-white">Il tuo Profilo</h2>
+                        <p className="text-sm">Email: {user?.email}</p>
+                    </div>
+                )}
 
-            {role === "admin" && view === "admin" && (
-              <div className="p-6 bg-brand rounded-xl shadow-lg">
-                <h2 className="text-2xl font-bold mb-4">Pannello Admin</h2>
-                <p>Accesso amministrativo abilitato.</p>
-              </div>
-            )}
+                {view === "stats" && <StatsPlaceholder />}
 
-      </main>
-        
-        {/* NAVIGAZIONE MOBILE FISSA */}
-        <MobileBar 
-            menuItems={menuItems} 
-            currentView={view} 
-            setView={setView} 
-        />
-    </div>
-  );
+                {/* Logica per Preview e Timer: per mobile, li renderemo a schermo intero se possibile, ma per ora manteniamo il ritorno alla Home */}
+                {(view === "preview" || view === "timer") && workoutData && (
+                    <div className="bg-brand p-4 rounded-xl shadow-lg">
+                        <button
+                            onClick={() => setView("myWorkouts")}
+                            className="mb-4 text-sm font-medium text-white hover:text-brand-accent transition-colors"
+                        >
+                            ← Torna alle Schede
+                        </button>
+                        {view === "preview" && (
+                            <PreviewWorkout
+                                workoutData={workoutData}
+                                onStart={() => { setView("timer"); setTimerActive(true) }}
+                                onBack={() => setView("myWorkouts")}
+                            />
+                        )}
+                        {view === "timer" && (
+                            <SimpleTimer workoutData={workoutData} onExit={handleExitTimer} />
+                        )}
+                    </div>
+                )}
+
+                {role === "admin" && view === "admin" && (
+                    <div className="p-6 bg-brand rounded-xl shadow-lg">
+                        <h2 className="text-2xl font-bold mb-4">Pannello Admin</h2>
+                        <p>Accesso amministrativo abilitato.</p>
+                    </div>
+                )}
+
+            </main>
+
+            {/* NAVIGAZIONE MOBILE FISSA */}
+            <MobileBar
+                menuItems={menuItems}
+                currentView={view}
+                setView={setView}
+            />
+        </div>
+    );
 }

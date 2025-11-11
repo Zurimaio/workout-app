@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { Edit2, Plus, Save, Trash2 } from "lucide-react";
 import { db } from "../../../lib/firebase";
 import { doc, getDoc, collection, addDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { WorkoutStats } from "../WorkoutStats";
+
 
 export default function WorkoutEditor({ selectedUser, initialData = null, onSave }) {
     const [workoutName, setWorkoutName] = useState(initialData?.name || "");
@@ -146,6 +148,8 @@ useEffect(() => {
     const handleSaveWorkout = async () => {
         if (!workoutName) return alert("Inserisci un nome per il workout");
         if (!selectedUser) return alert("Seleziona un utente");
+
+        const stats = calculateStats();
         const userWorkoutsRef = collection(db, "workouts", selectedUser.id, "userWorkouts");
         try {
             if (initialData?.id) {
@@ -155,6 +159,7 @@ useEffect(() => {
                     {
                         name: workoutName,
                         groups,
+                        stats,
                         updatedAt: serverTimestamp(),
                     },
                     { merge: true }
@@ -163,8 +168,9 @@ useEffect(() => {
             } else {
                 await addDoc(userWorkoutsRef, {
                     name: workoutName,
-                    createdAt: serverTimestamp(),
                     groups,
+                    stats,
+                    createdAt: serverTimestamp(),
                 });
                 alert("Workout salvato correttamente!");
             }
@@ -174,6 +180,41 @@ useEffect(() => {
             alert("Errore salvataggio workout");
         }
     };
+
+    // --- Calcola statistiche
+const calculateStats = () => {
+  const allExercises = Object.values(groups).flatMap(g => g.exercises || []);
+  if (!allExercises.length) return null;
+
+  const totalExercises = allExercises.length;
+  const ambitoCount = {};
+  let totalSets = 0;
+  let totalTime = 0;
+
+  allExercises.forEach(ex => {
+    const amb = ex.Ambito || "Non specificato";
+    ambitoCount[amb] = (ambitoCount[amb] || 0) + 1;
+    totalSets += ex.set || 0;
+
+    // Stima tempo: (Volume + Rest) * set
+    const volume = Number(ex.Volume) || 0;
+    const rest = Number(ex.Rest) || 0;
+    totalTime += (volume + rest) * (ex.set || 1);
+  });
+
+  const ambitoPercent = Object.fromEntries(
+    Object.entries(ambitoCount).map(([k, v]) => [k, ((v / totalExercises) * 100).toFixed(1) + "%"])
+  );
+
+  return {
+    totalExercises,
+    ambitoCount,
+    ambitoPercent,
+    estimatedDuration: Math.round(totalTime / 60), // in minuti
+    setsTotal: totalSets,
+  };
+};
+
 
     return (
         <div className="p-4 max-w-4xl mx-auto">
@@ -374,6 +415,9 @@ useEffect(() => {
             >
                 <Plus size={16} /> Aggiungi gruppo
             </button>
+
+            <WorkoutStats stats={calculateStats} />
+
 
             <button
                 onClick={handleSaveWorkout}

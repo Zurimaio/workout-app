@@ -1,6 +1,8 @@
 import React, { useRef, useState, useEffect } from "react";
 import { Dumbbell, Repeat, Clock, PauseCircle, StickyNote, Play, RefreshCcw } from "lucide-react";
-import SimpleTimer from "./SimpleTimer"; // importa il timer semplice
+// import SimpleTimer from "./SimpleTimer"; // importa il timer semplice
+
+import Timer from "./Timer/Timer";
 import { getGroupTag } from "../style/getGroupTag";
 
 
@@ -59,7 +61,7 @@ export default function PreviewWorkout({ workoutData, onStart, onReload }) {
             <Repeat className="w-6 h-6 text-green-400 animate-spin" />
             {activeGroup.name}
           </h2>
-          <SimpleTimer
+          <Timer
             workoutData={{ [activeGroup.id]: activeGroup.exercises, type: activeGroup.type}}
             onFinish={handleFinishGroup}
             audioCtx={audioCtx}
@@ -150,7 +152,7 @@ export default function PreviewWorkout({ workoutData, onStart, onReload }) {
                     }}
                     className="bg-green-600 text-white px-6 py-2 rounded-xl shadow hover:bg-green-700 flex items-center gap-2"
                   >
-                    <Play className="w-5 h-5" /> Avvia Timer Gruppo
+                    <Play className="w-5 h-5" /> Avvia Timer 
                   </button>
                 </div>
               </div>
