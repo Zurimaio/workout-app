@@ -2,12 +2,10 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 // Importamo solo le icone necessarie per la bottom bar, usando FaDumbbell per la Home
 import { MdPerson, MdBarChart, MdAdminPanelSettings, MdMenu } from "react-icons/md";
-import { FaDumbbell, FaChartBar, FaUser, FaTools } from "react-icons/fa"; // Usiamo Fa per le icone della bottom bar
+import { FaDumbbell, FaChartBar } from "react-icons/fa"; // Usiamo Fa per le icone della bottom bar
 import UserProfile from "../hooks/UserProfile";
-import MyWorkouts from "./MyWorkouts";
-import ProfileMenu from "./ProfileMenu"; // Non usata nella bottom bar, ma mantenuta
+import MyWorkouts from "./User/MyWorkouts";
 import SimpleTimer from "./SimpleTimer";
-import PreviewWorkout from "./PreviewWorkout";
 import Header from "./Header";
 import Sidebar from "../components/Sidebar"; // Mantenuta per schermi desktop
 import MobileBar from "./MobileBar";
@@ -46,14 +44,7 @@ export default function Dashboard() {
 
     if (role === "admin") menuItems.push({ key: "admin", label: "Admin", icon: <MdAdminPanelSettings /> });
 
-    // Se il timer è attivo, nascondi la sidebar e la bottom nav per focalizzare l'utente.
-    if (timerActive) {
-        return (
-            <div className="flex h-screen bg-brand-dark overflow-hidden">
-                <SimpleTimer workoutData={workoutData} onExit={handleExitTimer} />
-            </div>
-        );
-    }
+
 
     return (
         <div className="flex h-screen bg-brand-light md:bg-brand overflow-hidden">
@@ -93,27 +84,6 @@ export default function Dashboard() {
 
                 {view === "stats" && <StatsPlaceholder />}
 
-                {/* Logica per Preview e Timer: per mobile, li renderemo a schermo intero se possibile, ma per ora manteniamo il ritorno alla Home */}
-                {(view === "preview" || view === "timer") && workoutData && (
-                    <div className="bg-brand p-4 rounded-xl shadow-lg">
-                        <button
-                            onClick={() => setView("myWorkouts")}
-                            className="mb-4 text-sm font-medium text-white hover:text-brand-accent transition-colors"
-                        >
-                            ← Torna alle Schede
-                        </button>
-                        {view === "preview" && (
-                            <PreviewWorkout
-                                workoutData={workoutData}
-                                onStart={() => { setView("timer"); setTimerActive(true) }}
-                                onBack={() => setView("myWorkouts")}
-                            />
-                        )}
-                        {view === "timer" && (
-                            <SimpleTimer workoutData={workoutData} onExit={handleExitTimer} />
-                        )}
-                    </div>
-                )}
 
                 {role === "admin" && view === "admin" && (
                     <div className="p-6 bg-brand rounded-xl shadow-lg">

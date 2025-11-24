@@ -1,16 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { db } from "../../../lib/firebase";
-import { doc, getDoc, getDocs, collection, deleteDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, getDocs, collection, deleteDoc, setDoc, query, orderBy} from "firebase/firestore";
 import ExerciseList from "./ExerciseList";
 import UploadWorkout from "../UploadWorkout";
-import CreateWorkout from "../CreateWorkout";
-import PreviewWorkout from "../PreviewWorkout";
+import PreviewWorkout from "../User/PreviewWorkout";
 import Header from "../Header";
 import UserProfile from "../../hooks/UserProfile";
 import Sidebar from "../Sidebar";
 import WorkoutEditor from "./WorkoutEditor"
-import AddUserForm from "../AddUserForm";
-
+import UserWorkoutsList from "./UserWorkoutsList";
 import { useAuth } from "../../contexts/AuthContext";
 
 import { MdPeople, MdFitnessCenter, MdPerson, MdMenu } from "react-icons/md";
@@ -24,10 +22,9 @@ export default function AdminPanel() {
  */  const [selectedUser, setSelectedUser] = useState(null);
   const [workoutData, setWorkoutData] = useState(null);
   const [userList, setUserList] = useState([]);
-  const [userWorkouts, setUserWorkouts] = useState([]);
+  const [userWorkouts, setUserWorkouts] = useState({});
   const {profile, loadingProfile} = UserProfile(); 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  
   
 
 
@@ -47,16 +44,34 @@ export default function AdminPanel() {
   }, []);
 
   // Recupero i workout dell'utente
-  const fetchUserWorkouts = async (uid) => {
-    try {
-      const colRef = collection(db, "workouts", uid, "userWorkouts");
-      const snapshot = await getDocs(colRef);
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setUserWorkouts(data);
-    } catch (err) {
-      console.error("Errore caricamento workout utente:", err);
-    }
-  };
+// Recupero i workout dell'utente (ordinati e raggruppati per mese)
+const fetchUserWorkouts = async (uid) => {
+  try {
+    const colRef = collection(db, "workouts", uid, "userWorkouts");
+    const q = query(colRef, orderBy("createdAt", "desc"));
+    const snapshot = await getDocs(q);
+
+    const data = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate() : null,
+    }));
+
+    // Raggruppa per mese/anno
+    const grouped = data.reduce((acc, workout) => {
+      const date = workout.createdAt ? new Date(workout.createdAt) : new Date();
+      const key = date.toLocaleString("it-IT", { month: "long", year: "numeric" });
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(workout);
+      return acc;
+    }, {});
+
+    setUserWorkouts(grouped);
+  } catch (err) {
+    console.error("Errore caricamento workout utente:", err);
+  }
+};
+
 
   // Caricamento DB
   useEffect(() => {
@@ -329,63 +344,14 @@ const handleSaveWorkout = async (updatedData) => {
         )}
 
         {view === "userWorkouts" && selectedUser && (
-          <div>
-            <button
-              onClick={() => setView("users")}
-              className="mb-4 text-offwhite px-4 py-2 rounded hover:bg-brand-light"
-            >
-              ← Torna alla lista degli utenti
-            </button>
-            <div className="p-4 rounded">
-
-              <h2 className="text-2xl font-bold mb-4">Workout di {selectedUser.name}</h2>
-
-              <button
-                onClick={() => setView("create")}
-                className="mb-4 bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-              >
-                Crea nuovo workout
-              </button>
-
-              {userWorkouts.length === 0 ? (
-                <p>Nessun workout assegnato.</p>
-              ) : (
-                <ul className="space-y-2">
-                  {userWorkouts.map(w => (
-                    <li key={w.id} className="flex justify-between items-center p-2  bg-brand rounded hover:bg-brand-light shadow">
-                      <span>{w.name}</span>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            setWorkoutData(w.groups);
-                            setView("preview"); // puoi riusare la PreviewWorkout
-                          }}
-                          className="bg-green-500 text-white px-2 py-1 rounded hover:bg-yellow-600"
-                        >
-                          Preview
-                        </button>
-                        <button onClick={() => 
-                            handleChangeWorkout(w.id)}
-                            className="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-red-600"
-
-                          >
-                          Modifica
-                        </button>
-                        <button
-                          onClick={() => handleDeleteWorkout(w.id)}
-                          className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
-                        >
-                          Cancella
-                        </button>
-                        
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-          </div>
+          <UserWorkoutsList
+            selectedUser={selectedUser}
+            userWorkouts={userWorkouts}
+            setView={setView}
+            setWorkoutData={setWorkoutData}
+            handleChangeWorkout={handleChangeWorkout}
+            handleDeleteWorkout={handleDeleteWorkout}
+          />
         )}
 
         {view === "preview" && workoutData && (

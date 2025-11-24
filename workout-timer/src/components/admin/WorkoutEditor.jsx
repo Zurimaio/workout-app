@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Edit2, Plus, Save, Trash2 } from "lucide-react";
 import { db } from "../../../lib/firebase";
 import { doc, getDoc, collection, addDoc, serverTimestamp, setDoc } from "firebase/firestore";
-import { WorkoutStats } from "../WorkoutStats";
+import WorkoutStats from "../User/WorkoutStats";
 
 
 export default function WorkoutEditor({ selectedUser, initialData = null, onSave }) {
@@ -183,9 +183,14 @@ useEffect(() => {
 
     // --- Calcola statistiche
 const calculateStats = () => {
-  const allExercises = Object.values(groups).flatMap(g => g.exercises || []);
-  if (!allExercises.length) return null;
 
+  const allExercises = Object.values(groups).flatMap(g => g.exercises || []);
+  if (!allExercises.length) {
+    console.log("Nessun esercizio") 
+    return null;
+    }
+
+    console.log("calcolo statistiche");
   const totalExercises = allExercises.length;
   const ambitoCount = {};
   let totalSets = 0;
@@ -416,7 +421,7 @@ const calculateStats = () => {
                 <Plus size={16} /> Aggiungi gruppo
             </button>
 
-            <WorkoutStats stats={calculateStats} />
+            <WorkoutStats stats={calculateStats()} />
 
 
             <button
