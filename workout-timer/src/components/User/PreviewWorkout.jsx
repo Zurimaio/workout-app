@@ -156,6 +156,7 @@ export default function PreviewWorkout({ workoutData, onReload }) {
   const [audioCtx, setAudioCtx] = useState(null);
   const [activeTab, setActiveTab] = useState("workout"); // "workout" | "stats"
 
+
   const handleEnableAudio = async () => {
     if (!audioCtx) {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();

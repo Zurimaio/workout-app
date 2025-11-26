@@ -24,9 +24,10 @@ export default function MyWorkouts({ onPreview, onStart }) {
           groupCount: doc.data().groups
             ? Object.keys(doc.data().groups).length
             : 0,
-          createdAt: doc.data().createdAt?.toDate
+          createdAt: doc.data().createdAt instanceof Object && doc.data().createdAt.toDate
             ? doc.data().createdAt.toDate()
-            : null,
+            : new Date(doc.data().createdAt),
+
         }));
 
         // Raggruppa per mese/anno
@@ -112,7 +113,10 @@ export default function MyWorkouts({ onPreview, onStart }) {
                     {/* Pulsante anteprima */}
                     <div className="flex justify-center mt-4 md:mt-0 md:ml-4">
                       <button
-                        onClick={() => onPreview(w.groups)}
+                        onClick={() => {
+                          console.log("CLICK SU PREVIEW:", w);
+                          onPreview && onPreview(w);
+                        }}
                         className="w-full md:w-auto bg-green-500 text-white py-3 md:py-1 px-4 rounded-lg shadow-lg hover:bg-green-600 transition flex items-center justify-center gap-2 font-bold text-base"
                       >
                         <Eye className="w-5 h-5" /> Visualizza

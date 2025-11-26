@@ -9,6 +9,8 @@ import SimpleTimer from "./SimpleTimer";
 import Header from "./Header";
 import Sidebar from "../components/Sidebar"; // Mantenuta per schermi desktop
 import MobileBar from "./MobileBar";
+import PreviewWorkout from "./User/PreviewWorkout";
+
 // Placeholder Statistiche
 function StatsPlaceholder() {
     return (
@@ -70,7 +72,10 @@ export default function Dashboard() {
                     <MyWorkouts
                         // Aggiungere un bg-white e shadow-lg per MyWorkouts
                         workouts={myWorkouts}
-                        onPreview={(groups) => { setWorkoutData(groups); setView("preview"); }}
+                        onPreview={(groups) => {
+                            console.log("DATI RICEVUTI DALLA PREVIEW:", groups);
+                            setWorkoutData(groups); setView("preview");
+                        }}
                         onStart={(groups) => { setWorkoutData(groups); setView("timer"); setTimerActive(true) }}
                     />
                 )}
@@ -85,12 +90,30 @@ export default function Dashboard() {
                 {view === "stats" && <StatsPlaceholder />}
 
 
+                {view === "preview" && workoutData && (
+                    <div>
+                        <button
+                            onClick={() => setView("myWorkouts")}
+                            className="mb-4 bg-gray-300 text-black px-4 py-2 rounded hover:bg-gray-400"
+                        >
+                            ← Torna alla Home
+                        </button>
+                        <PreviewWorkout
+                            workoutData={workoutData}
+                            onStart={() => setView("timer")}
+                        />
+                    </div>
+                )}
+
                 {role === "admin" && view === "admin" && (
                     <div className="p-6 bg-brand rounded-xl shadow-lg">
                         <h2 className="text-2xl font-bold mb-4">Pannello Admin</h2>
                         <p>Accesso amministrativo abilitato.</p>
                     </div>
                 )}
+
+
+
 
             </main>
 
