@@ -174,7 +174,8 @@ export default function PreviewWorkout({ workoutData, onReload }) {
       }
     } else if (audioCtx.state === "suspended") {
       await audioCtx.resume();
-    }
+    } else if(audioCtx.state === "interrupted")
+          audioCtx.resume().catch(() => {});
   };
 
   const handleFinishGroup = () => {

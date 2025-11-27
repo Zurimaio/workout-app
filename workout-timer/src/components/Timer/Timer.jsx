@@ -36,23 +36,32 @@ export default function Timer({ workoutData, prepTime = 10, onFinish }) {
 
   // --- UTILS ---
 
-    useEffect(() => {
-      const unlockAudio = () => {
-        if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
-          audioCtxRef.current.resume().catch(() => { });
-        }
-        document.removeEventListener("touchstart", unlockAudio);
-        document.removeEventListener("click", unlockAudio);
-      };
+
+  useEffect(() => {
+    const unlockAudio = () => {
+      if (
+        audioCtxRef.current &&
+        (audioCtxRef.current.state === "suspended" ||
+          audioCtxRef.current.state === "interrupted")
+      ) {
+        audioCtxRef.current.resume().catch(() => { });
+      }
+
+      // Rimuovo i listener dopo il primo tap
+      document.removeEventListener("touchstart", unlockAudio);
+      document.removeEventListener("click", unlockAudio);
+    };
+
+    document.addEventListener("touchstart", unlockAudio, { passive: true });
+    document.addEventListener("click", unlockAudio, { passive: true });
+
+    return () => {
+      document.removeEventListener("touchstart", unlockAudio);
+      document.removeEventListener("click", unlockAudio);
+    };
+  }, []);
+
   
-      document.addEventListener("touchstart", unlockAudio);
-      document.addEventListener("click", unlockAudio);
-  
-      return () => {
-        document.removeEventListener("touchstart", unlockAudio);
-        document.removeEventListener("click", unlockAudio);
-      };
-    }, []);
 
 
   const isIOS = () =>
@@ -259,7 +268,8 @@ export default function Timer({ workoutData, prepTime = 10, onFinish }) {
     isRunning,
     timeRemaining,
     onTick: (nextTime) => setTimeRemaining(nextTime),
-    onFinish: finishCurrentPhase
+    onFinish: finishCurrentPhase, 
+    audioCtxRef
   });
 
   // --- INITIAL PREP ---

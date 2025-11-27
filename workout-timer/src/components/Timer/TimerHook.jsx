@@ -8,11 +8,11 @@ import { useEffect, useRef, useCallback } from "react";
  * @param {function} onTick - funzione chiamata ogni secondo con il nuovo tempo
  * @param {function} onFinish - funzione chiamata a fine countdown
  */
-export function useTimer({ isRunning, timeRemaining, onTick, onFinish }) {
+export function useTimer({ isRunning, timeRemaining, onTick, onFinish, audioCtxRef }) {
   const lastTickRef = useRef(Date.now());
   const rafRef = useRef(null);
   const visibilityRef = useRef(document.visibilityState);
-
+;
   const tick = useCallback(() => {
     const now = Date.now();
     const delta = Math.floor((now - lastTickRef.current) / 1000);
@@ -48,6 +48,13 @@ export function useTimer({ isRunning, timeRemaining, onTick, onFinish }) {
           if (nextTime <= 0) onFinish();
         }
         lastTickRef.current = now;
+
+        if (audioCtxRef.current?.state === "suspended" ||
+          audioCtxRef.current?.state === "interrupted") {
+          audioCtxRef.current.resume().catch(() => { });
+        }
+
+
       }
       visibilityRef.current = document.visibilityState;
     };
@@ -63,5 +70,5 @@ export function useTimer({ isRunning, timeRemaining, onTick, onFinish }) {
   }, [isRunning, timeRemaining, tick, onTick, onFinish]);
 
 
-  
+
 }
