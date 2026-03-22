@@ -1,0 +1,14 @@
+{
+    "name": "Calisthenics Workout Studio",
+    "short_name": "Workout",
+    "description": "Create and track calisthenics workouts with automated timers.",
+    "start_url": "/",
+    "display": "standalone",
+    "theme_color": "#0a0d14",
+    "background_color": "#0a0d14",
+    "icons": [{
+        "src": "favicon.svg",
+        "sizes": "any",
+        "type": "image/svg+xml"
+    }]
+}
